@@ -7,3 +7,6 @@
 *.pdb
 *.log
 appsettings.Development.json
+**/appsettings.Development.json
+**/bin/
+**/obj/
