@@ -29,7 +29,7 @@ Opsionale (për me pa databazën):
 - SQL Server Management Studio (SSMS)
 
 Kontroll:
-```bash
+bash
 dotnet --version
 docker --version
 git --version
