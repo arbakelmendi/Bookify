@@ -1,4 +1,4 @@
-# Bookify – Lab Course 1 (2025)
+# Bookify – Lab Course 1 (2026)
 Aplikacion web për librari personale (ngjashëm me Spotify/Prime Video), me:
 - menaxhim librash
 - friend requests
