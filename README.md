@@ -1,4 +1,4 @@
-# Bookify – Lab Course 1 (2025)
+# Bookify – Lab Course 1 (2026)
 Aplikacion web për librari personale (ngjashëm me Spotify/Prime Video), me:
 - menaxhim librash
 - friend requests
@@ -29,12 +29,12 @@ Opsionale (për me pa databazën):
 - SQL Server Management Studio (SSMS)
 
 Kontroll:
-```bash
+bash
 dotnet --version
 docker --version
 git --version
 
-
+---
 
 ## 2) Struktura e projektit
     Bookify/
@@ -45,6 +45,7 @@ git --version
     PersonalLibrary.Api/
   frontend/
 
+---
 
 ## 3) Ngritja e databazës (Docker Compose)
     Nga root i projektit:
@@ -59,6 +60,7 @@ git --version
     Reset i plotë i databazës (fshin të gjitha të dhënat):
         docker compose down -v
 
+---
 
  ## 4) Konfigurimi i Backend-it (Connection String)
 
@@ -75,6 +77,7 @@ Shembull:
      Password-i duhet të përputhet me atë në docker/.env.
      Ky file është i injoruar nga Git (.gitignore).
 
+---
 
 ## 5) Krijimi / përditësimi i databazës (EF Migrations)
 
@@ -84,6 +87,7 @@ Shembull:
     Kjo komandë:
         krijon databazën BookifyDb automatikisht
         krijon ose përditëson tabelat sipas migrations
+---
 
 ## 6) Nisja e Backend-it
 
@@ -93,6 +97,7 @@ Shembull:
         http://localhost:5116/swagger
 (Porti mund të ndryshojë sipas launchSettings)
 
+---
 
 ## 7) Nisja e Frontend-it
 
@@ -102,6 +107,7 @@ Shembull:
 Frontend duhet të lidhet me backend-in në:
     http://localhost:5116
 
+---
 
 ## 8) Workflow ekipor për databazën (Migrations)
 
@@ -121,6 +127,7 @@ Frontend duhet të lidhet me backend-in në:
 
     Databaza e tyre përditësohet automatikisht.
 
+---
 
 ## 9) Probleme të zakonshme
     EF migrations dështojnë
@@ -138,6 +145,7 @@ Frontend duhet të lidhet me backend-in në:
         cd ../backend/PersonalLibrary.Api
         dotnet ef database update
 
+---
 
 ## 10) Shënime të rëndësishme
 
