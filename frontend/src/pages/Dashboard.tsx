@@ -2,14 +2,80 @@ import { motion } from "framer-motion";
 import { BookOpen, BookMarked, CheckCircle, Clock, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { apiGet } from "@/api/client";
 import { mockUserBooks } from "@/data/mockData";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { useEffect, useMemo, useState } from "react";
+
+type ApiBook = {
+  id: number;
+  title: string;
+  author: string | null;
+  year: number | null;
+};
+
+// Ky tip është vetëm për UI-në që e ke tash (mockUserBooks)
+type UiBook = {
+  id: number | string;
+  title: string;
+  author?: string;
+  year?: number;
+  cover?: string;
+  progress?: number;
+  status?: "reading" | "finished" | "to-read";
+};
 
 const Dashboard = () => {
-  const totalBooks = mockUserBooks.length;
-  const readingBooks = mockUserBooks.filter(b => b.status === "reading");
-  const finishedBooks = mockUserBooks.filter(b => b.status === "finished");
-  const toReadBooks = mockUserBooks.filter(b => b.status === "to-read");
+  const [apiBooks, setApiBooks] = useState<ApiBook[] | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  // ✅ Merr librat nga backend (GET /api/books)
+  useEffect(() => {
+    let ignore = false;
+
+    (async () => {
+      try {
+        setApiError(null);
+        const data = await apiGet<ApiBook[]>("/api/books");
+        if (!ignore) {
+          setApiBooks(data);
+        }
+      } catch (err: any) {
+        if (!ignore) {
+          setApiError(err?.message ?? "Unknown API error");
+          setApiBooks(null);
+        }
+      }
+    })();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  // ✅ Konverto API books → UI books (për me e përdor në UI)
+  const booksForUi: UiBook[] = useMemo(() => {
+    if (apiBooks) {
+      return apiBooks.map((b) => ({
+        id: b.id,
+        title: b.title,
+        author: b.author ?? "Unknown",
+        year: b.year ?? undefined,
+        // këto s’i jep API-ja ende, i vendosim default për demo
+        cover: "https://placehold.co/200x300/png?text=Book",
+        progress: 0,
+        status: "to-read",
+      }));
+    }
+
+    // fallback në mock data nëse API s’ka data ose failon
+    return mockUserBooks as unknown as UiBook[];
+  }, [apiBooks]);
+
+  const totalBooks = booksForUi.length;
+  const readingBooks = booksForUi.filter((b) => b.status === "reading");
+  const finishedBooks = booksForUi.filter((b) => b.status === "finished");
+  const toReadBooks = booksForUi.filter((b) => b.status === "to-read");
 
   const activityData = [
     { name: "Mon", books: 2 },
@@ -34,6 +100,8 @@ const Dashboard = () => {
     { label: "To Read", value: toReadBooks.length, icon: Clock, color: "text-status-toread" }
   ];
 
+  const isFetchError = apiError?.toLowerCase().includes("failed to fetch");
+
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4">
@@ -48,6 +116,19 @@ const Dashboard = () => {
           <p className="text-muted-foreground">
             Track your reading progress and insights
           </p>
+
+          {/* ✅ status i thjeshtë për API */}
+          <div className="mt-3 text-sm">
+            {apiError && !isFetchError ? (
+              <span className="text-destructive">API error: {apiError}</span>
+            ) : apiBooks ? (
+              <span className="text-muted-foreground">Loaded {apiBooks.length} books from API.</span>
+            ) : apiError && isFetchError ? (
+              <span className="text-muted-foreground">API unavailable. Using mock data.</span>
+            ) : (
+              <span className="text-muted-foreground">Loading books from API...</span>
+            )}
+          </div>
         </motion.div>
 
         {/* Stats Grid */}
@@ -100,19 +181,19 @@ const Dashboard = () => {
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" />
                     <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: "hsl(var(--card))", 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px"
-                      }} 
+                      }}
                     />
-                    <Area 
-                      type="monotone" 
-                      dataKey="books" 
-                      stroke="hsl(var(--primary))" 
-                      fillOpacity={1} 
-                      fill="url(#colorBooks)" 
+                    <Area
+                      type="monotone"
+                      dataKey="books"
+                      stroke="hsl(var(--primary))"
+                      fillOpacity={1}
+                      fill="url(#colorBooks)"
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -145,20 +226,20 @@ const Dashboard = () => {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: "hsl(var(--card))", 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px"
-                      }} 
+                      }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="flex justify-center gap-6 mt-4">
-                  {pieData.map(item => (
+                  {pieData.map((item) => (
                     <div key={item.name} className="flex items-center gap-2">
-                      <div 
-                        className="w-3 h-3 rounded-full" 
+                      <div
+                        className="w-3 h-3 rounded-full"
                         style={{ backgroundColor: item.color }}
                       />
                       <span className="text-sm text-muted-foreground">{item.name}</span>
@@ -182,23 +263,27 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {readingBooks.map(book => (
-                  <div key={book.id} className="flex items-center gap-4">
-                    <img
-                      src={book.cover}
-                      alt={book.title}
-                      className="w-12 h-16 object-cover rounded"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-foreground line-clamp-1">{book.title}</h4>
-                      <p className="text-sm text-muted-foreground">{book.author}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Progress value={book.progress} className="h-1.5 flex-1" />
-                        <span className="text-xs text-muted-foreground">{book.progress}%</span>
+                {readingBooks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No books currently marked as reading.</p>
+                ) : (
+                  readingBooks.map((book) => (
+                    <div key={book.id} className="flex items-center gap-4">
+                      <img
+                        src={book.cover ?? "https://placehold.co/200x300/png?text=Book"}
+                        alt={book.title}
+                        className="w-12 h-16 object-cover rounded"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-foreground line-clamp-1">{book.title}</h4>
+                        <p className="text-sm text-muted-foreground">{book.author}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Progress value={book.progress ?? 0} className="h-1.5 flex-1" />
+                          <span className="text-xs text-muted-foreground">{book.progress ?? 0}%</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
