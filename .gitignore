@@ -10,3 +10,6 @@ appsettings.Development.json
 **/appsettings.Development.json
 **/bin/
 **/obj/
+frontend/.env
+frontend/.env.local
+
