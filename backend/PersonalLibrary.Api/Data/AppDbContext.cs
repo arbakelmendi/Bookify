@@ -11,6 +11,8 @@ public class AppDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<FriendRequest> FriendRequests => Set<FriendRequest>();
 
+    public DbSet<UserBook> UserBooks => Set<UserBook>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

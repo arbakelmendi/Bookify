@@ -6,5 +6,7 @@ public class User
 
     public string Email { get; set; } = string.Empty;
 
-    // If you already have PasswordHash, Username, etc. you can add them later.
+     // Store hashed password (NOT plain text)
+    public string PasswordHash { get; set; } = string.Empty;
 }
+
