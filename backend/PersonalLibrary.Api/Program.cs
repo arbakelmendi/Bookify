@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-
+using PersonalLibrary.Api.Modules.Ratings;
 using PersonalLibrary.Api.Data;
 using PersonalLibrary.Api.Modules.Auth;
 using PersonalLibrary.Api.Modules.Friends;
@@ -18,6 +18,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<FriendService>();
 builder.Services.AddScoped<ReadingService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<RatingsService>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));

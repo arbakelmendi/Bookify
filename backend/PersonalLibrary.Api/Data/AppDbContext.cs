@@ -11,10 +11,19 @@ public class AppDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<FriendRequest> FriendRequests => Set<FriendRequest>();
 
+    public DbSet<BookRating> BookRatings => Set<BookRating>();
+
+
     public DbSet<UserBook> UserBooks => Set<UserBook>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+
+        modelBuilder.Entity<BookRating>()
+            .HasIndex(br => new { br.UserId, br.BookId })
+            .IsUnique();
+
+
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.Entity<FriendRequest>()
