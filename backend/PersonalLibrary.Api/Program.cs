@@ -8,6 +8,8 @@ using PersonalLibrary.Api.Data;
 using PersonalLibrary.Api.Modules.Auth;
 using PersonalLibrary.Api.Modules.Friends;
 using PersonalLibrary.Api.Modules.Reading;
+using PersonalLibrary.Api.Modules.Authors;
+using PersonalLibrary.Api.Modules.Categories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +21,8 @@ builder.Services.AddScoped<FriendService>();
 builder.Services.AddScoped<ReadingService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<RatingsService>();
+builder.Services.AddScoped<AuthorsService>();
+builder.Services.AddScoped<CategoriesService>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
