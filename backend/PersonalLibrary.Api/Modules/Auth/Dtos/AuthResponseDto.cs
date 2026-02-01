@@ -1,3 +1,5 @@
 namespace PersonalLibrary.Api.Modules.Auth.Dtos;
 
-public record AuthResponseDto(string Token);
+using PersonalLibrary.Api.Modules.Users.Dtos;
+
+public record AuthResponseDto(string Token, UserDto User);

@@ -6,6 +6,10 @@ public class User
 
     public string Email { get; set; } = string.Empty;
 
+    public string Username { get; set; } = string.Empty;
+
+    public string Role { get; set; } = "user";
+
      // Store hashed password (NOT plain text)
     public string PasswordHash { get; set; } = string.Empty;
 }

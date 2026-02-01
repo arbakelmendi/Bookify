@@ -22,7 +22,7 @@ public class UsersController : ControllerBase
     public async Task<ActionResult<List<UserDto>>> GetAll()
     {
         var users = await _context.Users
-            .Select(u => new UserDto(u.Id, u.Email))
+            .Select(u => new UserDto(u.Id, u.Email, u.Username, u.Role))
             .ToListAsync();
 
         return Ok(users);
@@ -34,7 +34,7 @@ public class UsersController : ControllerBase
         var user = await _context.Users.FindAsync(id);
         if (user == null) return NotFound();
 
-        return Ok(new UserDto(user.Id, user.Email));
+        return Ok(new UserDto(user.Id, user.Email, user.Username, user.Role));
     }
 
     [HttpPut("{id:int}")]

@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using PersonalLibrary.Api.Modules.Ratings;
 using PersonalLibrary.Api.Data;
+using PersonalLibrary.Api.Models;
 using PersonalLibrary.Api.Modules.Auth;
 using PersonalLibrary.Api.Modules.Friends;
 using PersonalLibrary.Api.Modules.Reading;
@@ -49,6 +50,31 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+// Seed admin user
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var context = services.GetRequiredService<AppDbContext>();
+
+    // Check if admin user exists
+    var adminEmail = "admin@bookify.com";
+    var adminExists = await context.Users.AnyAsync(u => u.Email.ToLower() == adminEmail.ToLower());
+
+    if (!adminExists)
+    {
+        var adminUser = new User
+        {
+            Email = adminEmail,
+            Username = "admin",
+            Role = "admin",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123")
+        };
+
+        context.Users.Add(adminUser);
+        await context.SaveChangesAsync();
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

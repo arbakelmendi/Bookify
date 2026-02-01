@@ -1,12 +1,78 @@
 const BASE_URL = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? "");
+const TOKEN_KEY = "bookify_auth_token";
 
-export async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`);
+function getAuthHeaders(): HeadersInit {
+  const token = localStorage.getItem(TOKEN_KEY);
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
 
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
+async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
+    // Handle 401 Unauthorized - token expired or invalid
+    if (response.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      window.location.href = "/login";
+      throw new Error("Session expired. Please login again.");
+    }
+
     const text = await response.text();
-    throw new Error(`HTTP ${response.status}: ${text}`);
+    let errorMessage = `HTTP ${response.status}: ${text}`;
+
+    try {
+      const json = JSON.parse(text);
+      errorMessage = json.message || errorMessage;
+    } catch {
+      // If not JSON, use the text as is
+    }
+
+    throw new Error(errorMessage);
   }
 
   return response.json();
+}
+
+export async function apiGet<T>(path: string): Promise<T> {
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method: "GET",
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<T>(response);
+}
+
+export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  return handleResponse<T>(response);
+}
+
+export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  return handleResponse<T>(response);
+}
+
+export async function apiDelete<T>(path: string): Promise<T> {
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<T>(response);
 }

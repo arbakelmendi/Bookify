@@ -44,11 +44,8 @@ const Signup = () => {
 
     setIsLoading(true);
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const result = await signup(username, email, password);
 
-    const result = signup(username, email, password);
-    
     if (result.success) {
       toast({
         title: "Account created!",
@@ -62,7 +59,7 @@ const Signup = () => {
         variant: "destructive",
       });
     }
-    
+
     setIsLoading(false);
   };
 

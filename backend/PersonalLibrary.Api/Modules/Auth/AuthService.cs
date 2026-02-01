@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using PersonalLibrary.Api.Data;
 using PersonalLibrary.Api.Models;
 using PersonalLibrary.Api.Modules.Auth.Dtos;
+using PersonalLibrary.Api.Modules.Users.Dtos;
 
 namespace PersonalLibrary.Api.Modules.Auth;
 
@@ -23,13 +24,19 @@ public class AuthService
     public async Task<(bool ok, string error)> RegisterAsync(RegisterDto dto)
     {
         var email = dto.Email.Trim().ToLower();
+        var username = dto.Username.Trim();
 
-        var exists = await _context.Users.AnyAsync(u => u.Email.ToLower() == email);
-        if (exists) return (false, "Email is already registered.");
+        var emailExists = await _context.Users.AnyAsync(u => u.Email.ToLower() == email);
+        if (emailExists) return (false, "Email is already registered.");
+
+        var usernameExists = await _context.Users.AnyAsync(u => u.Username.ToLower() == username.ToLower());
+        if (usernameExists) return (false, "Username is already taken.");
 
         var user = new User
         {
             Email = email,
+            Username = username,
+            Role = "user",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password)
         };
 
@@ -39,7 +46,7 @@ public class AuthService
         return (true, "");
     }
 
-    public async Task<(bool ok, string error, string? token)> LoginAsync(LoginDto dto)
+    public async Task<(bool ok, string error, AuthResponseDto? response)> LoginAsync(LoginDto dto)
     {
         var email = dto.Email.Trim().ToLower();
 
@@ -50,7 +57,10 @@ public class AuthService
         if (!valid) return (false, "Invalid email or password.", null);
 
         var token = GenerateJwtToken(user);
-        return (true, "", token);
+        var userDto = new UserDto(user.Id, user.Email, user.Username, user.Role);
+        var response = new AuthResponseDto(token, userDto);
+
+        return (true, "", response);
     }
 
     private string GenerateJwtToken(User user)
@@ -67,7 +77,9 @@ public class AuthService
         {
             // This is IMPORTANT for your other controllers (Friends/Reading) to read userId
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Email, user.Email)
+            new Claim(ClaimTypes.Email, user.Email),
+            new Claim(ClaimTypes.Name, user.Username),
+            new Claim(ClaimTypes.Role, user.Role)
         };
 
         var token = new JwtSecurityToken(

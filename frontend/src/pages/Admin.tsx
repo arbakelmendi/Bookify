@@ -1,33 +1,20 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { 
-  Users, 
-  BookOpen, 
-  BarChart3, 
-  Settings, 
+import {
+  Users,
+  BookOpen,
+  BarChart3,
+  Settings,
   Shield,
-  Search,
-  MoreHorizontal,
-  UserX,
-  UserCheck,
-  Trash2,
   TrendingUp,
   Activity,
   Library
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -36,18 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useAuth, AppUser } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { mockBooks } from "@/data/mockData";
 import {
   AreaChart,
@@ -83,49 +59,18 @@ const categoryData = [
 const COLORS = ["hsl(var(--primary))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
 
 const Admin = () => {
-  const { isAdmin, users, updateUser, deleteUser } = useAuth();
-  const { toast } = useToast();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<AppUser | null>(null);
+  const { isAdmin } = useAuth();
 
   // Redirect if not admin
   if (!isAdmin) {
     return <Navigate to="/login" replace />;
   }
 
-  const filteredUsers = users.filter(
-    user =>
-      user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const handleSuspendUser = (user: AppUser) => {
-    const newStatus = user.status === "active" ? "suspended" : "active";
-    updateUser(user.id, { status: newStatus });
-    toast({
-      title: newStatus === "suspended" ? "User Suspended" : "User Activated",
-      description: `${user.username} has been ${newStatus === "suspended" ? "suspended" : "reactivated"}.`,
-    });
-  };
-
-  const handleDeleteUser = () => {
-    if (userToDelete) {
-      deleteUser(userToDelete.id);
-      toast({
-        title: "User Deleted",
-        description: `${userToDelete.username} has been permanently deleted.`,
-        variant: "destructive",
-      });
-      setUserToDelete(null);
-      setDeleteDialogOpen(false);
-    }
-  };
-
+  // Mock stats for now - these would come from real API calls in production
   const stats = [
     {
       title: "Total Users",
-      value: users.length,
+      value: 42,
       icon: Users,
       change: "+12%",
       changeType: "positive" as const,
@@ -139,7 +84,7 @@ const Admin = () => {
     },
     {
       title: "Active Sessions",
-      value: Math.floor(users.length * 0.7),
+      value: 28,
       icon: Activity,
       change: "+8%",
       changeType: "positive" as const,
@@ -232,101 +177,19 @@ const Admin = () => {
             <TabsContent value="users">
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>User Management</CardTitle>
-                      <CardDescription>
-                        View and manage all registered users
-                      </CardDescription>
-                    </div>
-                    <div className="relative w-64">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search users..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9"
-                      />
-                    </div>
-                  </div>
+                  <CardTitle>User Management</CardTitle>
+                  <CardDescription>
+                    View and manage all registered users
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {filteredUsers.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>No users found</p>
-                      <p className="text-sm">Users will appear here when they sign up</p>
-                    </div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Username</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Joined</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredUsers.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell className="font-medium">{user.username}</TableCell>
-                            <TableCell>{user.email}</TableCell>
-                            <TableCell>
-                              <Badge variant={user.role === "admin" ? "default" : "secondary"}>
-                                {user.role}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={user.status === "active" ? "outline" : "destructive"}>
-                                {user.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {new Date(user.createdAt).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon">
-                                    <MoreHorizontal className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleSuspendUser(user)}>
-                                    {user.status === "active" ? (
-                                      <>
-                                        <UserX className="w-4 h-4 mr-2" />
-                                        Suspend User
-                                      </>
-                                    ) : (
-                                      <>
-                                        <UserCheck className="w-4 h-4 mr-2" />
-                                        Activate User
-                                      </>
-                                    )}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="text-destructive"
-                                    onClick={() => {
-                                      setUserToDelete(user);
-                                      setDeleteDialogOpen(true);
-                                    }}
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    Delete User
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p className="font-medium">User Management Coming Soon</p>
+                    <p className="text-sm mt-2">
+                      Full user management features will be available once the backend APIs are implemented.
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -474,23 +337,6 @@ const Admin = () => {
         </motion.div>
       </div>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete User</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete {userToDelete?.username}? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

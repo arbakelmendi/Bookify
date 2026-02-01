@@ -10,12 +10,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
-  const { login } = useAuth();
+
+  const { login, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -23,19 +23,16 @@ const Login = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const result = await login(email, password);
 
-    const result = login(username, password);
-    
     if (result.success) {
       toast({
         title: "Welcome back!",
-        description: username === "admin" ? "Redirecting to admin dashboard..." : "Login successful!",
+        description: "Login successful!",
       });
-      
-      // Redirect based on role
-      if (username === "admin") {
+
+      // Redirect based on role from the user object
+      if (user?.role === "admin") {
         navigate("/admin");
       } else {
         navigate("/");
@@ -47,7 +44,7 @@ const Login = () => {
         variant: "destructive",
       });
     }
-    
+
     setIsLoading(false);
   };
 
@@ -77,13 +74,13 @@ const Login = () => {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  id="username"
-                  type="text"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                   className="bg-background"
                 />
