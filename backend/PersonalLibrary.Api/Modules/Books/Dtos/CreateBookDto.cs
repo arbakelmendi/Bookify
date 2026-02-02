@@ -1,11 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace PersonalLibrary.Api.Models;
+namespace PersonalLibrary.Api.Modules.Books.Dtos;
 
-public class Book
+public class CreateBookDto
 {
-    public int Id { get; set; }
-
     [Required, MaxLength(200)]
     public string Title { get; set; } = string.Empty;
 
@@ -20,4 +18,3 @@ public class Book
 
     public int? Year { get; set; }
 }
-

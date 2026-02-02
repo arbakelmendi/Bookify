@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PersonalLibrary.Api.Data;
 using PersonalLibrary.Api.Models;
+using PersonalLibrary.Api.Modules.Books.Dtos;
 
 namespace PersonalLibrary.Api.Modules.Books;
 
@@ -35,8 +36,17 @@ public class BooksController : ControllerBase
 
     // POST: /api/Books
     [HttpPost]
-    public async Task<ActionResult<Book>> Create([FromBody] Book book)
+    public async Task<ActionResult<Book>> Create([FromBody] CreateBookDto dto)
     {
+        var book = new Book
+        {
+            Title = dto.Title,
+            Author = dto.Author,
+            Description = dto.Description,
+            CoverImageUrl = dto.CoverImageUrl,
+            Year = dto.Year
+        };
+
         _db.Books.Add(book);
         await _db.SaveChangesAsync();
 
@@ -45,13 +55,15 @@ public class BooksController : ControllerBase
 
     // PUT: /api/Books/5
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, [FromBody] Book updated)
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateBookDto updated)
     {
         var book = await _db.Books.FirstOrDefaultAsync(b => b.Id == id);
         if (book == null) return NotFound();
 
         book.Title = updated.Title;
         book.Author = updated.Author;
+        book.Description = updated.Description;
+        book.CoverImageUrl = updated.CoverImageUrl;
         book.Year = updated.Year;
 
         await _db.SaveChangesAsync();

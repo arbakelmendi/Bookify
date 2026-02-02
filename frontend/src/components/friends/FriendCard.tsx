@@ -24,7 +24,7 @@ export const FriendCard = ({ friend, index = 0 }: FriendCardProps) => {
 
   const handleBookClick = (bookId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    navigate(`/book/${bookId}`);
+    navigate(`/books/${bookId}`);
   };
 
   return (

@@ -219,12 +219,12 @@ const FriendProfile = () => {
               src={friendData.currentlyReading.cover}
               alt={friendData.currentlyReading.title}
               className="w-20 h-28 rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => navigate(`/book/${friendData.currentlyReading.id}`)}
+              onClick={() => navigate(`/books/${friendData.currentlyReading.id}`)}
             />
             <div className="flex-1 space-y-2">
               <h4 
                 className="font-medium text-foreground hover:text-primary cursor-pointer transition-colors"
-                onClick={() => navigate(`/book/${friendData.currentlyReading.id}`)}
+                onClick={() => navigate(`/books/${friendData.currentlyReading.id}`)}
               >
                 {friendData.currentlyReading.title}
               </h4>
@@ -310,7 +310,7 @@ const FriendProfile = () => {
                     src={item.book.cover}
                     alt={item.book.title}
                     className="w-12 h-16 rounded object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => navigate(`/book/${item.book.id}`)}
+                    onClick={() => navigate(`/books/${item.book.id}`)}
                   />
                   <div className="flex-1">
                     <p className="text-foreground">
@@ -319,7 +319,7 @@ const FriendProfile = () => {
                           <span className="font-medium">{friend.name}</span> finished reading{" "}
                           <span 
                             className="font-medium text-primary cursor-pointer hover:underline"
-                            onClick={() => navigate(`/book/${item.book.id}`)}
+                            onClick={() => navigate(`/books/${item.book.id}`)}
                           >
                             {item.book.title}
                           </span>
@@ -330,7 +330,7 @@ const FriendProfile = () => {
                           <span className="font-medium">{friend.name}</span> started reading{" "}
                           <span 
                             className="font-medium text-primary cursor-pointer hover:underline"
-                            onClick={() => navigate(`/book/${item.book.id}`)}
+                            onClick={() => navigate(`/books/${item.book.id}`)}
                           >
                             {item.book.title}
                           </span>
@@ -341,7 +341,7 @@ const FriendProfile = () => {
                           <span className="font-medium">{friend.name}</span> reviewed{" "}
                           <span 
                             className="font-medium text-primary cursor-pointer hover:underline"
-                            onClick={() => navigate(`/book/${item.book.id}`)}
+                            onClick={() => navigate(`/books/${item.book.id}`)}
                           >
                             {item.book.title}
                           </span>
@@ -358,7 +358,7 @@ const FriendProfile = () => {
                           <span className="font-medium">{friend.name}</span> added{" "}
                           <span 
                             className="font-medium text-primary cursor-pointer hover:underline"
-                            onClick={() => navigate(`/book/${item.book.id}`)}
+                            onClick={() => navigate(`/books/${item.book.id}`)}
                           >
                             {item.book.title}
                           </span>{" "}
@@ -392,12 +392,12 @@ const FriendProfile = () => {
                       src={book.cover}
                       alt={book.title}
                       className="w-16 h-24 rounded object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => navigate(`/book/${book.id}`)}
+                      onClick={() => navigate(`/books/${book.id}`)}
                     />
                     <div className="flex-1">
                       <h4 
                         className="font-medium text-foreground hover:text-primary cursor-pointer transition-colors"
-                        onClick={() => navigate(`/book/${book.id}`)}
+                        onClick={() => navigate(`/books/${book.id}`)}
                       >
                         {book.title}
                       </h4>
@@ -476,7 +476,7 @@ const FriendProfile = () => {
                         alt={book.title}
                         className="w-16 h-24 rounded object-cover cursor-pointer hover:opacity-80 transition-opacity"
                         title={book.title}
-                        onClick={() => navigate(`/book/${book.id}`)}
+                        onClick={() => navigate(`/books/${book.id}`)}
                       />
                     ))}
                   </div>

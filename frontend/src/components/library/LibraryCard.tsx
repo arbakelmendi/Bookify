@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Star, MoreVertical } from "lucide-react";
 import { UserBook, ReadingStatus } from "@/types/book";
@@ -37,19 +38,29 @@ export const LibraryCard = ({
   onRatingChange 
 }: LibraryCardProps) => {
   const [hoveredStar, setHoveredStar] = useState(0);
+  const navigate = useNavigate();
+  const coverSrc = book.coverImageUrl || book.cover || "https://placehold.co/200x300/png?text=Book";
+
+  const handleNavigate = () => {
+    navigate(`/books/${book.id}`);
+  };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05, duration: 0.3 }}
-      className="glass-card group relative rounded-xl overflow-hidden"
+      className="glass-card group relative rounded-xl overflow-hidden cursor-pointer"
+      onClick={handleNavigate}
     >
       <div className="flex gap-4 p-4">
         <img
-          src={book.cover}
+          src={coverSrc}
           alt={book.title}
           className="w-20 h-28 object-cover rounded-lg shadow-md flex-shrink-0"
+          onError={(e) => {
+            e.currentTarget.src = "https://placehold.co/200x300/png?text=Book";
+          }}
         />
         
         <div className="flex-1 min-w-0">
@@ -61,15 +72,23 @@ export const LibraryCard = ({
               <p className="text-sm text-muted-foreground line-clamp-1">
                 {book.author}
               </p>
+              <p className="text-xs text-muted-foreground line-clamp-2">
+                {book.description || "No description available yet."}
+              </p>
             </div>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 flex-shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <MoreVertical className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenuItem onClick={() => onStatusChange?.(book.id, "to-read")}>
                   Mark as To Read
                 </DropdownMenuItem>
@@ -105,7 +124,10 @@ export const LibraryCard = ({
                 key={star}
                 onMouseEnter={() => setHoveredStar(star)}
                 onMouseLeave={() => setHoveredStar(0)}
-                onClick={() => onRatingChange?.(book.id, star)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRatingChange?.(book.id, star);
+                }}
                 className="p-0.5"
               >
                 <Star

@@ -171,7 +171,7 @@ const Friends = () => {
                       {activity.type === "added" && " added "}
                       <span 
                         className="font-medium text-primary cursor-pointer hover:underline"
-                        onClick={() => navigate(`/book/${activity.book.id}`)}
+                        onClick={() => navigate(`/books/${activity.book.id}`)}
                       >
                         {activity.book.title}
                       </span>
@@ -183,7 +183,7 @@ const Friends = () => {
                     src={activity.book.cover}
                     alt={activity.book.title}
                     className="w-10 h-14 rounded object-cover cursor-pointer hover:opacity-80"
-                    onClick={() => navigate(`/book/${activity.book.id}`)}
+                    onClick={() => navigate(`/books/${activity.book.id}`)}
                   />
                 </motion.div>
               ))}

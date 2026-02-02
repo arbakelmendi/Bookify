@@ -7,7 +7,6 @@ namespace PersonalLibrary.Api.Modules.Ratings;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class RatingsController : ControllerBase
 {
     private readonly RatingsService _service;
