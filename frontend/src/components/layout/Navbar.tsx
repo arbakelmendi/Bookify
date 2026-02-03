@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-<<<<<<< HEAD
-import { Search, BookOpen, Menu, X, LogIn, LogOut, User } from "lucide-react";
-=======
 import { Search, BookOpen, Menu, X, LogIn, LogOut, User, Shield } from "lucide-react";
-
->>>>>>> 6c6c3fadbcb834fea22d5f9c3daa8201035d10f1
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,17 +13,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 
-<<<<<<< HEAD
-=======
-const navLinks = [
-  { name: "Discover", path: "/" },
-  { name: "My Library", path: "/library" },
-  { name: "Dashboard", path: "/dashboard" },
-  { name: "Friends", path: "/friends" },
-  { name: "Import", path: "/import" }, 
-];
-
->>>>>>> 6c6c3fadbcb834fea22d5f9c3daa8201035d10f1
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,7 +20,6 @@ export const Navbar = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
 
-<<<<<<< HEAD
   // Dynamic nav links based on authentication and role
   const getNavLinks = () => {
     const links = [{ name: "Discover", path: "/" }];
@@ -47,10 +30,6 @@ export const Navbar = () => {
         { name: "Progress", path: "/dashboard" }
       );
 
-      if (isAdmin) {
-        links.push({ name: "Dashboard", path: "/admin" });
-      }
-
       links.push({ name: "Friends", path: "/friends" });
     }
 
@@ -58,13 +37,12 @@ export const Navbar = () => {
   };
 
   const navLinks = getNavLinks();
-=======
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const q = params.get("q") ?? "";
     setSearchQuery(q);
   }, [location.search]);
->>>>>>> 6c6c3fadbcb834fea22d5f9c3daa8201035d10f1
 
   const handleLogout = () => {
     logout();
@@ -121,8 +99,6 @@ export const Navbar = () => {
                 )}
               </Link>
             ))}
-<<<<<<< HEAD
-=======
 
             {isAdmin && (
               <Link
@@ -143,7 +119,6 @@ export const Navbar = () => {
                 )}
               </Link>
             )}
->>>>>>> 6c6c3fadbcb834fea22d5f9c3daa8201035d10f1
           </div>
 
           {/* Search & Actions */}
@@ -173,8 +148,6 @@ export const Navbar = () => {
                     Signed in as {user?.email}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-<<<<<<< HEAD
-=======
 
                   {isAdmin && (
                     <>
@@ -186,7 +159,6 @@ export const Navbar = () => {
                     </>
                   )}
 
->>>>>>> 6c6c3fadbcb834fea22d5f9c3daa8201035d10f1
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="w-4 h-4 mr-2" />
                     Sign Out
@@ -239,9 +211,6 @@ export const Navbar = () => {
                   {link.name}
                 </Link>
               ))}
-<<<<<<< HEAD
-              <div className="relative mt-2">
-=======
 
               {isAdmin && (
                 <Link
@@ -259,7 +228,6 @@ export const Navbar = () => {
               )}
 
               <form className="relative mt-2" onSubmit={handleSearchSubmitForm}>
->>>>>>> 6c6c3fadbcb834fea22d5f9c3daa8201035d10f1
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   type="text"
@@ -286,10 +254,6 @@ export const Navbar = () => {
                   </>
                 ) : (
                   <>
-<<<<<<< HEAD
-                    <Button variant="outline" onClick={() => { navigate("/login"); setIsOpen(false); }} className="w-full">
-                      Login
-=======
                     <Button
                       variant="outline"
                       onClick={() => {
@@ -299,7 +263,6 @@ export const Navbar = () => {
                       className="w-full"
                     >
                       Sign In
->>>>>>> 6c6c3fadbcb834fea22d5f9c3daa8201035d10f1
                     </Button>
                     <Button
                       onClick={() => {
