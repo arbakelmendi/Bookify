@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, BookOpen, Menu, X, LogIn, LogOut, User, Shield } from "lucide-react";
+import { Search, BookOpen, Menu, X, LogIn, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,19 +13,34 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 
-const navLinks = [
-  { name: "Discover", path: "/" },
-  { name: "My Library", path: "/library" },
-  { name: "Dashboard", path: "/dashboard" },
-  { name: "Friends", path: "/friends" }
-];
-
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
+
+  // Dynamic nav links based on authentication and role
+  const getNavLinks = () => {
+    const links = [{ name: "Discover", path: "/" }];
+
+    if (isAuthenticated) {
+      links.push(
+        { name: "My Library", path: "/library" },
+        { name: "Progress", path: "/dashboard" }
+      );
+
+      if (isAdmin) {
+        links.push({ name: "Dashboard", path: "/admin" });
+      }
+
+      links.push({ name: "Friends", path: "/friends" });
+    }
+
+    return links;
+  };
+
+  const navLinks = getNavLinks();
 
   const handleLogout = () => {
     logout();
@@ -67,25 +82,6 @@ export const Navbar = () => {
                 )}
               </Link>
             ))}
-            {isAdmin && (
-              <Link
-                to="/admin"
-                className={`nav-link relative py-1 text-sm font-medium transition-colors flex items-center gap-1 ${
-                  location.pathname === "/admin"
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Shield className="w-4 h-4" />
-                Admin
-                {location.pathname === "/admin" && (
-                  <motion.div
-                    layoutId="activeNav"
-                    className="absolute -bottom-1 left-0 right-0 h-0.5 bg-primary rounded-full"
-                  />
-                )}
-              </Link>
-            )}
           </div>
 
           {/* Search & Actions */}
@@ -114,15 +110,6 @@ export const Navbar = () => {
                     Signed in as {user?.email}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  {isAdmin && (
-                    <>
-                      <DropdownMenuItem onClick={() => navigate("/admin")}>
-                        <Shield className="w-4 h-4 mr-2" />
-                        Admin Dashboard
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="w-4 h-4 mr-2" />
                     Sign Out
@@ -132,7 +119,7 @@ export const Navbar = () => {
             ) : (
               <div className="flex items-center gap-2">
                 <Button variant="ghost" onClick={() => navigate("/login")}>
-                  Sign In
+                  Login
                 </Button>
                 <Button onClick={() => navigate("/signup")}>
                   <LogIn className="w-4 h-4 mr-2" />
@@ -175,20 +162,6 @@ export const Navbar = () => {
                   {link.name}
                 </Link>
               ))}
-              {isAdmin && (
-                <Link
-                  to="/admin"
-                  onClick={() => setIsOpen(false)}
-                  className={`py-2 text-sm font-medium flex items-center gap-2 ${
-                    location.pathname === "/admin"
-                      ? "text-primary"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  <Shield className="w-4 h-4" />
-                  Admin
-                </Link>
-              )}
               <div className="relative mt-2">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -213,7 +186,7 @@ export const Navbar = () => {
                 ) : (
                   <>
                     <Button variant="outline" onClick={() => { navigate("/login"); setIsOpen(false); }} className="w-full">
-                      Sign In
+                      Login
                     </Button>
                     <Button onClick={() => { navigate("/signup"); setIsOpen(false); }} className="w-full">
                       <LogIn className="w-4 h-4 mr-2" />

@@ -1,16 +1,156 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Star, Headphones, Play, Plus, BookOpen, Clock } from "lucide-react";
+import { Star, Headphones, Play, Plus, BookOpen, Clock, Users, TrendingUp, BookMarked } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { mockBooks } from "@/data/mockData";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const HeroSection = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const featuredBook = mockBooks[0];
 
   const handleBookClick = () => {
     navigate(`/book/${featuredBook.id}`);
   };
+
+  // Landing page for non-authenticated users
+  if (!isAuthenticated) {
+    return (
+      <section className="relative min-h-[80vh] flex items-center overflow-hidden">
+        {/* Background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-background" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent" />
+
+        {/* Content */}
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="space-y-8"
+            >
+              <div className="space-y-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 text-primary text-sm font-medium"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  Your Personal Library
+                </motion.div>
+
+                <h1 className="text-5xl md:text-6xl lg:text-7xl font-display font-bold text-foreground leading-tight">
+                  Welcome to{" "}
+                  <span className="text-primary">Bookify</span>
+                </h1>
+
+                <p className="text-xl text-muted-foreground max-w-xl leading-relaxed">
+                  Your ultimate companion for managing, discovering, and enjoying books. Track your reading progress, connect with friends, and explore thousands of titles.
+                </p>
+              </div>
+
+              {/* Features */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="flex flex-col items-start gap-2"
+                >
+                  <div className="p-3 bg-primary/10 rounded-lg">
+                    <BookMarked className="w-6 h-6 text-primary" />
+                  </div>
+                  <h3 className="font-semibold">Track Progress</h3>
+                  <p className="text-sm text-muted-foreground">Monitor your reading journey</p>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="flex flex-col items-start gap-2"
+                >
+                  <div className="p-3 bg-primary/10 rounded-lg">
+                    <Users className="w-6 h-6 text-primary" />
+                  </div>
+                  <h3 className="font-semibold">Connect</h3>
+                  <p className="text-sm text-muted-foreground">Share with friends</p>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="flex flex-col items-start gap-2"
+                >
+                  <div className="p-3 bg-primary/10 rounded-lg">
+                    <TrendingUp className="w-6 h-6 text-primary" />
+                  </div>
+                  <h3 className="font-semibold">Discover</h3>
+                  <p className="text-sm text-muted-foreground">Find your next favorite</p>
+                </motion.div>
+              </div>
+
+              {/* CTA Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                <Button
+                  size="lg"
+                  className="text-lg px-8"
+                  onClick={() => navigate("/signup")}
+                >
+                  Sign Up
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="text-lg px-8"
+                  onClick={() => navigate("/login")}
+                >
+                  Login
+                </Button>
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                Join thousands of readers already using Bookify
+              </p>
+            </motion.div>
+
+            {/* Right side - Book showcase */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="hidden md:flex justify-center"
+            >
+              <div className="relative">
+                <div className="absolute -inset-8 bg-gradient-to-r from-primary/20 to-primary/10 rounded-3xl blur-3xl" />
+                <div className="relative grid grid-cols-2 gap-4">
+                  {mockBooks.slice(0, 4).map((book, index) => (
+                    <motion.div
+                      key={book.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.5 + index * 0.1 }}
+                      className="group"
+                    >
+                      <img
+                        src={book.cover}
+                        alt={book.title}
+                        className="w-32 h-44 object-cover rounded-lg shadow-xl transition-transform duration-300 hover:scale-105 hover:shadow-2xl"
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="relative min-h-[70vh] flex items-center overflow-hidden">
