@@ -8,6 +8,7 @@ using PersonalLibrary.Api.Modules.Friends;
 using PersonalLibrary.Api.Modules.Reading;
 using PersonalLibrary.Api.Modules.Authors;
 using PersonalLibrary.Api.Modules.Categories;
+using Microsoft.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -71,6 +72,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 
+builder.Services.AddHttpClient<PersonalLibrary.Api.Services.GoogleBooksService>();
+
+
 var app = builder.Build();
 
 // Seed admin user
@@ -95,6 +99,31 @@ using (var scope = app.Services.CreateScope())
 
         context.Users.Add(adminUser);
         await context.SaveChangesAsync();
+    }
+}
+
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var services = scope.ServiceProvider;
+    var context = services.GetRequiredService<AppDbContext>();
+    var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("DbSeeder");
+
+    try
+    {
+        var canConnect = await context.Database.CanConnectAsync();
+        if (!canConnect)
+        {
+            logger.LogWarning("Skipping book seeding: database is not reachable.");
+        }
+        else
+        {
+            await DbSeeder.SeedAsync(context, logger);
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error during book seeding.");
     }
 }
 

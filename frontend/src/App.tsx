@@ -1,13 +1,18 @@
+import { useEffect } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
+
 import Discover from "@/pages/Discover";
 import Library from "@/pages/Library";
 import Dashboard from "@/pages/Dashboard";
@@ -19,14 +24,16 @@ import BookDetail from "@/pages/BookDetail";
 import BookAudio from "@/pages/BookAudio";
 import FriendProfile from "@/pages/FriendProfile";
 import NotFound from "@/pages/NotFound";
-import { useEffect } from "react";
-import { api } from "./lib/api";
+import ImportBook from "@/pages/ImportBook";
+
+import { api } from "@/lib/api";
 
 const queryClient = new QueryClient();
 
 const App = () => {
   useEffect(() => {
-    api.get("/api/Auth/me")
+    api
+      .get("/api/Auth/me")
       .then((r) => console.log("OK", r.data))
       .catch((e) => console.log("ERR", e.response?.status));
   }, []);
@@ -43,6 +50,8 @@ const App = () => {
               <main className="flex-1">
                 <Routes>
                   <Route path="/" element={<Discover />} />
+                  <Route path="/import" element={<ImportBook />} />
+
                   <Route
                     path="/library"
                     element={
@@ -67,8 +76,10 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   />
+
                   <Route path="/login" element={<Login />} />
                   <Route path="/signup" element={<Signup />} />
+
                   <Route
                     path="/admin"
                     element={
@@ -77,6 +88,7 @@ const App = () => {
                       </AdminRoute>
                     }
                   />
+
                   <Route
                     path="/books/:id"
                     element={
@@ -85,6 +97,7 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   />
+                 
                   <Route
                     path="/books/:id/audio"
                     element={
@@ -101,6 +114,7 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   />
+
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>

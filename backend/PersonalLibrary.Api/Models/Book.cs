@@ -19,5 +19,7 @@ public class Book
     public string CoverImageUrl { get; set; } = string.Empty;
 
     public int? Year { get; set; }
+
+
 }
 

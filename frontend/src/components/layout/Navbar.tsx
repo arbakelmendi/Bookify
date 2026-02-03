@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Search, BookOpen, Menu, X, LogIn, LogOut, User, Shield } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,7 +18,8 @@ const navLinks = [
   { name: "Discover", path: "/" },
   { name: "My Library", path: "/library" },
   { name: "Dashboard", path: "/dashboard" },
-  { name: "Friends", path: "/friends" }
+  { name: "Friends", path: "/friends" },
+  { name: "Import", path: "/import" }, 
 ];
 
 export const Navbar = () => {
@@ -27,9 +29,30 @@ export const Navbar = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const q = params.get("q") ?? "";
+    setSearchQuery(q);
+  }, [location.search]);
+
   const handleLogout = () => {
     logout();
     navigate("/");
+  };
+
+  const handleSearchSubmit = () => {
+    const query = searchQuery.trim();
+    if (query.length > 0) {
+      navigate(`/?q=${encodeURIComponent(query)}`);
+    } else {
+      navigate("/");
+    }
+    setIsOpen(false);
+  };
+
+  const handleSearchSubmitForm = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSearchSubmit();
   };
 
   return (
@@ -48,7 +71,7 @@ export const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            {navLinks.map(link => (
+            {navLinks.map((link) => (
               <Link
                 key={link.path}
                 to={link.path}
@@ -67,6 +90,7 @@ export const Navbar = () => {
                 )}
               </Link>
             ))}
+
             {isAdmin && (
               <Link
                 to="/admin"
@@ -90,7 +114,7 @@ export const Navbar = () => {
 
           {/* Search & Actions */}
           <div className="hidden md:flex items-center gap-4">
-            <div className="relative">
+            <form className="relative" onSubmit={handleSearchSubmitForm}>
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 type="text"
@@ -99,21 +123,23 @@ export const Navbar = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 w-64 bg-muted/50"
               />
-            </div>
+            </form>
 
             {isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="gap-2">
                     <User className="w-4 h-4" />
-                    {user?.username}
+                    {user?.username ?? "User"}
                   </Button>
                 </DropdownMenuTrigger>
+
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem disabled className="text-xs text-muted-foreground">
                     Signed in as {user?.email}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+
                   {isAdmin && (
                     <>
                       <DropdownMenuItem onClick={() => navigate("/admin")}>
@@ -123,6 +149,7 @@ export const Navbar = () => {
                       <DropdownMenuSeparator />
                     </>
                   )}
+
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="w-4 h-4 mr-2" />
                     Sign Out
@@ -161,7 +188,7 @@ export const Navbar = () => {
             className="md:hidden py-4 border-t border-border"
           >
             <div className="flex flex-col gap-4">
-              {navLinks.map(link => (
+              {navLinks.map((link) => (
                 <Link
                   key={link.path}
                   to={link.path}
@@ -175,6 +202,7 @@ export const Navbar = () => {
                   {link.name}
                 </Link>
               ))}
+
               {isAdmin && (
                 <Link
                   to="/admin"
@@ -189,7 +217,8 @@ export const Navbar = () => {
                   Admin
                 </Link>
               )}
-              <div className="relative mt-2">
+
+              <form className="relative mt-2" onSubmit={handleSearchSubmitForm}>
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   type="text"
@@ -198,12 +227,16 @@ export const Navbar = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 bg-muted/50"
                 />
-              </div>
+              </form>
+
               <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-border">
                 {isAuthenticated ? (
                   <>
                     <div className="text-sm text-muted-foreground px-2">
-                      Signed in as <span className="font-medium text-foreground">{user?.username}</span>
+                      Signed in as{" "}
+                      <span className="font-medium text-foreground">
+                        {user?.username}
+                      </span>
                     </div>
                     <Button variant="outline" onClick={handleLogout} className="w-full">
                       <LogOut className="w-4 h-4 mr-2" />
@@ -212,10 +245,23 @@ export const Navbar = () => {
                   </>
                 ) : (
                   <>
-                    <Button variant="outline" onClick={() => { navigate("/login"); setIsOpen(false); }} className="w-full">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        navigate("/login");
+                        setIsOpen(false);
+                      }}
+                      className="w-full"
+                    >
                       Sign In
                     </Button>
-                    <Button onClick={() => { navigate("/signup"); setIsOpen(false); }} className="w-full">
+                    <Button
+                      onClick={() => {
+                        navigate("/signup");
+                        setIsOpen(false);
+                      }}
+                      className="w-full"
+                    >
                       <LogIn className="w-4 h-4 mr-2" />
                       Sign Up
                     </Button>

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { HeroSection } from "@/components/home/HeroSection";
 import { BookSection } from "@/components/books/BookSection";
 import { getBooks } from "@/api/books";
@@ -8,6 +9,7 @@ const Discover = () => {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     let active = true;
@@ -35,10 +37,20 @@ const Discover = () => {
     };
   }, []);
 
-  const trending = books.filter(book => book.rating >= 4.5);
-  const newReleases = books.filter(book => book.publishedYear >= 2023);
-  const audiobooks = books.filter(book => book.isAudiobook);
-  const recommended = books.slice(0, 6);
+  const query = (searchParams.get("q") ?? "").trim().toLowerCase();
+  const visibleBooks = useMemo(() => {
+    if (!query) return books;
+    return books.filter((book) => {
+      const title = book.title.toLowerCase();
+      const author = (book.author ?? "").toLowerCase();
+      return title.includes(query) || author.includes(query);
+    });
+  }, [books, query]);
+
+  const trending = visibleBooks.filter(book => book.rating >= 4.5);
+  const newReleases = visibleBooks.filter(book => book.publishedYear >= 2023);
+  const audiobooks = visibleBooks.filter(book => book.isAudiobook);
+  const recommended = visibleBooks.slice(0, 6);
 
   return (
     <div className="min-h-screen">
@@ -49,10 +61,13 @@ const Discover = () => {
         {error && <p className="text-destructive">{error}</p>}
         {!loading && !error && (
           <>
-            <BookSection title="Trending Now" books={trending.length ? trending : books} />
-            <BookSection title="New Releases" books={newReleases.length ? newReleases : books} />
-            <BookSection title="Audiobooks" books={audiobooks.length ? audiobooks : books} />
-            <BookSection title="Recommended for You" books={recommended.length ? recommended : books} />
+            {query && visibleBooks.length === 0 && (
+              <p className="text-muted-foreground">No books found for "{query}".</p>
+            )}
+            <BookSection title="Trending Now" books={trending.length ? trending : visibleBooks} />
+            <BookSection title="New Releases" books={newReleases.length ? newReleases : visibleBooks} />
+            <BookSection title="Audiobooks" books={audiobooks.length ? audiobooks : visibleBooks} />
+            <BookSection title="Recommended for You" books={recommended.length ? recommended : visibleBooks} />
           </>
         )}
       </div>

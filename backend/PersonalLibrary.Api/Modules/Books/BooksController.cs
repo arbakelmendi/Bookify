@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PersonalLibrary.Api.Data;
 using PersonalLibrary.Api.Models;
 using PersonalLibrary.Api.Modules.Books.Dtos;
+using PersonalLibrary.Api.Services;
 
 namespace PersonalLibrary.Api.Modules.Books;
 
@@ -81,4 +82,15 @@ public class BooksController : ControllerBase
         await _db.SaveChangesAsync();
         return NoContent();
     }
+
+
+
+[HttpGet("external/isbn/{isbn}")]
+public async Task<IActionResult> GetExternalByIsbn(string isbn, [FromServices] GoogleBooksService svc)
+{
+    var result = await svc.GetByIsbnAsync(isbn);
+    if (result is null) return NotFound();
+    return Ok(result);
+}
+
 }
