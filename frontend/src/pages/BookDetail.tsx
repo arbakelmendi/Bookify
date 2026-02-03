@@ -1,4 +1,5 @@
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   Star, 
@@ -17,19 +18,60 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { mockBooks } from "@/data/mockData";
+import { getBookById, getBooks } from "@/api/books";
 import { BookSection } from "@/components/books/BookSection";
+import type { Book } from "@/types/book";
 
 const BookDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const book = mockBooks.find(b => b.id === id);
+  const [book, setBook] = useState<Book | null>(null);
+  const [allBooks, setAllBooks] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!book) {
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+
+    const load = async () => {
+      try {
+        const [detail, list] = await Promise.all([getBookById(id), getBooks()]);
+        if (active) {
+          setBook(detail);
+          setAllBooks(list);
+        }
+      } catch (e) {
+        if (active) {
+          setError(e instanceof Error ? e.message : "Failed to load book.");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    load();
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Loading book...</p>
+      </div>
+    );
+  }
+
+  if (error || !book) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
           <h1 className="text-2xl font-bold text-foreground">Book not found</h1>
+          {error && <p className="text-destructive">{error}</p>}
           <Button onClick={() => navigate("/")}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Discover
@@ -40,14 +82,16 @@ const BookDetail = () => {
   }
 
   // Get related books (same category, excluding current)
-  const relatedBooks = mockBooks
+  const relatedBooks = allBooks
     .filter(b => b.category === book.category && b.id !== book.id)
     .slice(0, 6);
 
   // Get more from author (mock - just get some books)
-  const moreFromAuthor = mockBooks
+  const moreFromAuthor = allBooks
     .filter(b => b.id !== book.id)
     .slice(0, 4);
+
+  const coverSrc = book.coverImageUrl || book.cover || "https://placehold.co/600x900/png?text=Book";
 
   return (
     <div className="min-h-screen">
@@ -56,7 +100,7 @@ const BookDetail = () => {
         {/* Background */}
         <div 
           className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${book.cover})` }}
+          style={{ backgroundImage: `url(${coverSrc})` }}
         >
           <div className="absolute inset-0 bg-gradient-to-r from-background via-background/95 to-background/50" />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/30" />
@@ -88,9 +132,12 @@ const BookDetail = () => {
               <div className="relative">
                 <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 to-primary/5 rounded-2xl blur-2xl" />
                 <img
-                  src={book.cover}
+                  src={coverSrc}
                   alt={book.title}
                   className="relative w-64 h-80 md:w-72 md:h-96 object-cover rounded-xl shadow-2xl"
+                  onError={(e) => {
+                    e.currentTarget.src = "https://placehold.co/600x900/png?text=Book";
+                  }}
                 />
                 {book.isAudiobook && (
                   <div className="absolute -bottom-4 -right-4 bg-primary text-primary-foreground p-4 rounded-full shadow-lg">
@@ -159,10 +206,7 @@ const BookDetail = () => {
               <div className="space-y-2">
                 <h3 className="font-semibold text-foreground">About this book</h3>
                 <p className="text-muted-foreground leading-relaxed max-w-2xl">
-                  {book.description}
-                </p>
-                <p className="text-muted-foreground leading-relaxed max-w-2xl">
-                  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
+                  {book.description || "No description available yet."}
                 </p>
               </div>
 
@@ -172,12 +216,15 @@ const BookDetail = () => {
                   <Plus className="w-5 h-5" />
                   Add to Library
                 </Button>
-                {book.isAudiobook && (
-                  <Button size="lg" variant="outline" className="gap-2">
-                    <Play className="w-5 h-5" />
-                    Listen Now
-                  </Button>
-                )}
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => navigate(`/books/${book.id}/audio`)}
+                >
+                  <Play className="w-5 h-5" />
+                  Listen Now
+                </Button>
                 <Button size="lg" variant="outline" className="gap-2">
                   <Bookmark className="w-5 h-5" />
                   Save

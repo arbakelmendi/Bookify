@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PersonalLibrary.Api.Data;
 
@@ -11,9 +12,11 @@ using PersonalLibrary.Api.Data;
 namespace PersonalLibrary.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260202151512_AddCoverImageUrlToBooks")]
+    partial class AddCoverImageUrlToBooks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -36,7 +39,7 @@ namespace PersonalLibrary.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Authors", (string)null);
+                    b.ToTable("Authors");
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.Book", b =>
@@ -69,7 +72,7 @@ namespace PersonalLibrary.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Books", (string)null);
+                    b.ToTable("Books");
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.BookRating", b =>
@@ -96,7 +99,7 @@ namespace PersonalLibrary.Api.Migrations
                     b.HasIndex("UserId", "BookId")
                         .IsUnique();
 
-                    b.ToTable("BookRatings", (string)null);
+                    b.ToTable("BookRatings");
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.Category", b =>
@@ -113,7 +116,7 @@ namespace PersonalLibrary.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Categories", (string)null);
+                    b.ToTable("Categories");
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.FriendRequest", b =>
@@ -146,7 +149,7 @@ namespace PersonalLibrary.Api.Migrations
 
                     b.HasIndex("SenderId");
 
-                    b.ToTable("FriendRequests", (string)null);
+                    b.ToTable("FriendRequests");
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.User", b =>
@@ -175,7 +178,7 @@ namespace PersonalLibrary.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.UserBook", b =>
@@ -202,7 +205,7 @@ namespace PersonalLibrary.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserBooks", (string)null);
+                    b.ToTable("UserBooks");
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.BookRating", b =>

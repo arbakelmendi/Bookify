@@ -1,16 +1,44 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Search, Filter } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LibraryCard } from "@/components/library/LibraryCard";
-import { mockUserBooks } from "@/data/mockData";
 import { UserBook, ReadingStatus } from "@/types/book";
+import { getUserBooks } from "@/api/books";
 
 const Library = () => {
-  const [books, setBooks] = useState<UserBook[]>(mockUserBooks);
+  const [books, setBooks] = useState<UserBook[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ReadingStatus | "all">("all");
+
+  useEffect(() => {
+    let active = true;
+
+    const load = async () => {
+      try {
+        const data = await getUserBooks();
+        if (active) {
+          setBooks(data);
+        }
+      } catch (e) {
+        if (active) {
+          setError(e instanceof Error ? e.message : "Failed to load library.");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    load();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const filters: { label: string; value: ReadingStatus | "all" }[] = [
     { label: "All Books", value: "all" },
@@ -52,7 +80,7 @@ const Library = () => {
             My Library
           </h1>
           <p className="text-muted-foreground">
-            {books.length} books in your collection
+            {loading ? "Loading..." : `${books.length} books in your collection`}
           </p>
         </motion.div>
 
@@ -87,6 +115,8 @@ const Library = () => {
             ))}
           </div>
         </motion.div>
+
+        {error && <p className="text-destructive mb-4">{error}</p>}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredBooks.map((book, index) => (

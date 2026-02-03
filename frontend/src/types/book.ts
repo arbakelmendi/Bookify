@@ -5,11 +5,13 @@ export interface Book {
   title: string;
   author: string;
   cover: string;
+  coverImageUrl?: string;
   rating: number;
   category: string;
   description: string;
   pages: number;
   publishedYear: number;
+  year?: number;
   duration?: string;
   isAudiobook?: boolean;
 }

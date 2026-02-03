@@ -1,7 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+<<<<<<< HEAD
 import { Search, BookOpen, Menu, X, LogIn, LogOut, User } from "lucide-react";
+=======
+import { Search, BookOpen, Menu, X, LogIn, LogOut, User, Shield } from "lucide-react";
+
+>>>>>>> 6c6c3fadbcb834fea22d5f9c3daa8201035d10f1
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,6 +18,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 
+<<<<<<< HEAD
+=======
+const navLinks = [
+  { name: "Discover", path: "/" },
+  { name: "My Library", path: "/library" },
+  { name: "Dashboard", path: "/dashboard" },
+  { name: "Friends", path: "/friends" },
+  { name: "Import", path: "/import" }, 
+];
+
+>>>>>>> 6c6c3fadbcb834fea22d5f9c3daa8201035d10f1
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -20,6 +36,7 @@ export const Navbar = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
 
+<<<<<<< HEAD
   // Dynamic nav links based on authentication and role
   const getNavLinks = () => {
     const links = [{ name: "Discover", path: "/" }];
@@ -41,10 +58,32 @@ export const Navbar = () => {
   };
 
   const navLinks = getNavLinks();
+=======
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const q = params.get("q") ?? "";
+    setSearchQuery(q);
+  }, [location.search]);
+>>>>>>> 6c6c3fadbcb834fea22d5f9c3daa8201035d10f1
 
   const handleLogout = () => {
     logout();
     navigate("/");
+  };
+
+  const handleSearchSubmit = () => {
+    const query = searchQuery.trim();
+    if (query.length > 0) {
+      navigate(`/?q=${encodeURIComponent(query)}`);
+    } else {
+      navigate("/");
+    }
+    setIsOpen(false);
+  };
+
+  const handleSearchSubmitForm = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSearchSubmit();
   };
 
   return (
@@ -63,7 +102,7 @@ export const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            {navLinks.map(link => (
+            {navLinks.map((link) => (
               <Link
                 key={link.path}
                 to={link.path}
@@ -82,11 +121,34 @@ export const Navbar = () => {
                 )}
               </Link>
             ))}
+<<<<<<< HEAD
+=======
+
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className={`nav-link relative py-1 text-sm font-medium transition-colors flex items-center gap-1 ${
+                  location.pathname === "/admin"
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                Admin
+                {location.pathname === "/admin" && (
+                  <motion.div
+                    layoutId="activeNav"
+                    className="absolute -bottom-1 left-0 right-0 h-0.5 bg-primary rounded-full"
+                  />
+                )}
+              </Link>
+            )}
+>>>>>>> 6c6c3fadbcb834fea22d5f9c3daa8201035d10f1
           </div>
 
           {/* Search & Actions */}
           <div className="hidden md:flex items-center gap-4">
-            <div className="relative">
+            <form className="relative" onSubmit={handleSearchSubmitForm}>
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 type="text"
@@ -95,21 +157,36 @@ export const Navbar = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 w-64 bg-muted/50"
               />
-            </div>
+            </form>
 
             {isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="gap-2">
                     <User className="w-4 h-4" />
-                    {user?.username}
+                    {user?.username ?? "User"}
                   </Button>
                 </DropdownMenuTrigger>
+
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem disabled className="text-xs text-muted-foreground">
                     Signed in as {user?.email}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+<<<<<<< HEAD
+=======
+
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuItem onClick={() => navigate("/admin")}>
+                        <Shield className="w-4 h-4 mr-2" />
+                        Admin Dashboard
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+
+>>>>>>> 6c6c3fadbcb834fea22d5f9c3daa8201035d10f1
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="w-4 h-4 mr-2" />
                     Sign Out
@@ -148,7 +225,7 @@ export const Navbar = () => {
             className="md:hidden py-4 border-t border-border"
           >
             <div className="flex flex-col gap-4">
-              {navLinks.map(link => (
+              {navLinks.map((link) => (
                 <Link
                   key={link.path}
                   to={link.path}
@@ -162,7 +239,27 @@ export const Navbar = () => {
                   {link.name}
                 </Link>
               ))}
+<<<<<<< HEAD
               <div className="relative mt-2">
+=======
+
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  onClick={() => setIsOpen(false)}
+                  className={`py-2 text-sm font-medium flex items-center gap-2 ${
+                    location.pathname === "/admin"
+                      ? "text-primary"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  <Shield className="w-4 h-4" />
+                  Admin
+                </Link>
+              )}
+
+              <form className="relative mt-2" onSubmit={handleSearchSubmitForm}>
+>>>>>>> 6c6c3fadbcb834fea22d5f9c3daa8201035d10f1
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   type="text"
@@ -171,12 +268,16 @@ export const Navbar = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 bg-muted/50"
                 />
-              </div>
+              </form>
+
               <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-border">
                 {isAuthenticated ? (
                   <>
                     <div className="text-sm text-muted-foreground px-2">
-                      Signed in as <span className="font-medium text-foreground">{user?.username}</span>
+                      Signed in as{" "}
+                      <span className="font-medium text-foreground">
+                        {user?.username}
+                      </span>
                     </div>
                     <Button variant="outline" onClick={handleLogout} className="w-full">
                       <LogOut className="w-4 h-4 mr-2" />
@@ -185,10 +286,28 @@ export const Navbar = () => {
                   </>
                 ) : (
                   <>
+<<<<<<< HEAD
                     <Button variant="outline" onClick={() => { navigate("/login"); setIsOpen(false); }} className="w-full">
                       Login
+=======
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        navigate("/login");
+                        setIsOpen(false);
+                      }}
+                      className="w-full"
+                    >
+                      Sign In
+>>>>>>> 6c6c3fadbcb834fea22d5f9c3daa8201035d10f1
                     </Button>
-                    <Button onClick={() => { navigate("/signup"); setIsOpen(false); }} className="w-full">
+                    <Button
+                      onClick={() => {
+                        navigate("/signup");
+                        setIsOpen(false);
+                      }}
+                      className="w-full"
+                    >
                       <LogIn className="w-4 h-4 mr-2" />
                       Sign Up
                     </Button>

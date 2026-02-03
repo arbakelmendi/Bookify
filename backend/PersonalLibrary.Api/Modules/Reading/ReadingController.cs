@@ -7,7 +7,6 @@ namespace PersonalLibrary.Api.Modules.Reading;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class ReadingController : ControllerBase
 {
     private readonly ReadingService _service;

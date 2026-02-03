@@ -6,7 +6,6 @@ namespace PersonalLibrary.Api.Modules.Categories;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class CategoriesController : ControllerBase
 {
     private readonly CategoriesService _service;

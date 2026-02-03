@@ -1,11 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace PersonalLibrary.Api.Models;
+namespace PersonalLibrary.Api.Modules.Books.Dtos;
 
-public class Book
+public class UpdateBookDto
 {
-    public int Id { get; set; }
-
     [Required, MaxLength(200)]
     public string Title { get; set; } = string.Empty;
 
@@ -19,7 +17,4 @@ public class Book
     public string CoverImageUrl { get; set; } = string.Empty;
 
     public int? Year { get; set; }
-
-
 }
-

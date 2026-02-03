@@ -9,9 +9,10 @@ export const HeroSection = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const featuredBook = mockBooks[0];
+  const coverSrc = featuredBook.coverImageUrl || featuredBook.cover || "https://placehold.co/600x900/png?text=Book";
 
   const handleBookClick = () => {
-    navigate(`/book/${featuredBook.id}`);
+    navigate(`/books/${featuredBook.id}`);
   };
 
   // Landing page for non-authenticated users
@@ -157,7 +158,7 @@ export const HeroSection = () => {
       {/* Background */}
       <div 
         className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url(${featuredBook.cover})` }}
+        style={{ backgroundImage: `url(${coverSrc})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/95 to-background/50" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/30" />
@@ -234,7 +235,7 @@ export const HeroSection = () => {
             <div className="relative group">
               <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 to-primary/5 rounded-2xl blur-2xl group-hover:from-primary/30 transition-all" />
               <img
-                src={featuredBook.cover}
+                src={coverSrc}
                 alt={featuredBook.title}
                 className="relative w-72 h-96 object-cover rounded-xl shadow-2xl transition-transform duration-300 group-hover:scale-105"
               />

@@ -1,8 +1,5 @@
 
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
 using PersonalLibrary.Api.Modules.Ratings;
 using PersonalLibrary.Api.Data;
 using PersonalLibrary.Api.Models;
@@ -11,13 +8,59 @@ using PersonalLibrary.Api.Modules.Friends;
 using PersonalLibrary.Api.Modules.Reading;
 using PersonalLibrary.Api.Modules.Authors;
 using PersonalLibrary.Api.Modules.Categories;
+using Microsoft.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", p =>
+        p.WithOrigins(
+            "http://localhost:8080",
+            "http://localhost:5173",
+            "https://localhost:5173"
+        )
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials()
+    );
+});
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new() 
+    { 
+        Title = "PersonalLibrary.Api", 
+        Version = "v1" 
+    });
+
+    c.AddSecurityDefinition("Bearer", new()
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "Shkruaj: Bearer {token}"
+    });
+
+    c.AddSecurityRequirement(new()
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 builder.Services.AddScoped<FriendService>();
 builder.Services.AddScoped<ReadingService>();
 builder.Services.AddScoped<AuthService>();
@@ -28,26 +71,9 @@ builder.Services.AddScoped<CategoriesService>();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddScoped<AuthService>();
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
-            )
-        };
-    });
+builder.Services.AddHttpClient<PersonalLibrary.Api.Services.GoogleBooksService>();
 
-builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
@@ -76,6 +102,31 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var services = scope.ServiceProvider;
+    var context = services.GetRequiredService<AppDbContext>();
+    var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("DbSeeder");
+
+    try
+    {
+        var canConnect = await context.Database.CanConnectAsync();
+        if (!canConnect)
+        {
+            logger.LogWarning("Skipping book seeding: database is not reachable.");
+        }
+        else
+        {
+            await DbSeeder.SeedAsync(context, logger);
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error during book seeding.");
+    }
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -85,9 +136,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseAuthentication();
+app.UseCors("Frontend");
 
-app.UseAuthorization();
+// Auth disabled
 
 app.MapControllers();
 

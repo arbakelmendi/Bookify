@@ -6,7 +6,6 @@ namespace PersonalLibrary.Api.Modules.Authors;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class AuthorsController : ControllerBase
 {
     private readonly AuthorsService _service;

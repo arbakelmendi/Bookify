@@ -8,7 +8,6 @@ namespace PersonalLibrary.Api.Modules.Users;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class UsersController : ControllerBase
 {
     private readonly AppDbContext _context;

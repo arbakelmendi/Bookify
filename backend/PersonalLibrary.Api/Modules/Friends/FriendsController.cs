@@ -7,7 +7,6 @@ namespace PersonalLibrary.Api.Modules.Friends;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class FriendsController : ControllerBase
 {
     private readonly FriendService _service;

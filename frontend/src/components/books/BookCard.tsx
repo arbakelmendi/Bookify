@@ -11,9 +11,10 @@ interface BookCardProps {
 
 export const BookCard = ({ book, index = 0 }: BookCardProps) => {
   const navigate = useNavigate();
+  const coverSrc = book.coverImageUrl || book.cover || "https://placehold.co/200x300/png?text=Book";
 
   const handleClick = () => {
-    navigate(`/book/${book.id}`);
+    navigate(`/books/${book.id}`);
   };
 
   const handleAddToLibrary = (e: React.MouseEvent) => {
@@ -31,9 +32,12 @@ export const BookCard = ({ book, index = 0 }: BookCardProps) => {
     >
       <div className="relative overflow-hidden rounded-lg shadow-lg">
         <img
-          src={book.cover}
+          src={coverSrc}
           alt={book.title}
           className="w-full h-64 object-cover transition-transform duration-300 group-hover:scale-105"
+          onError={(e) => {
+            e.currentTarget.src = "https://placehold.co/200x300/png?text=Book";
+          }}
         />
         
         {book.isAudiobook && (
@@ -58,6 +62,9 @@ export const BookCard = ({ book, index = 0 }: BookCardProps) => {
         </h3>
         <p className="text-xs text-muted-foreground line-clamp-1">
           {book.author}
+        </p>
+        <p className="text-xs text-muted-foreground line-clamp-2">
+          {book.description || "No description available yet."}
         </p>
         <div className="flex items-center gap-2 text-xs">
           <div className="flex items-center gap-1 text-primary">
