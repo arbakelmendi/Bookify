@@ -43,6 +43,8 @@ public class UsersController : ControllerBase
         if (user == null) return NotFound();
 
         user.Email = dto.Email;
+        user.Username = dto.Username;
+        user.Role = dto.Role;
         await _context.SaveChangesAsync();
 
         return NoContent();

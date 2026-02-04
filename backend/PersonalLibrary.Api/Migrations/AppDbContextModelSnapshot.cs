@@ -36,7 +36,7 @@ namespace PersonalLibrary.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Authors");
+                    b.ToTable("Authors", (string)null);
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.Book", b =>
@@ -69,7 +69,7 @@ namespace PersonalLibrary.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Books");
+                    b.ToTable("Books", (string)null);
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.BookRating", b =>
@@ -96,7 +96,7 @@ namespace PersonalLibrary.Api.Migrations
                     b.HasIndex("UserId", "BookId")
                         .IsUnique();
 
-                    b.ToTable("BookRatings");
+                    b.ToTable("BookRatings", (string)null);
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.Category", b =>
@@ -113,7 +113,7 @@ namespace PersonalLibrary.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Categories");
+                    b.ToTable("Categories", (string)null);
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.FriendRequest", b =>
@@ -146,7 +146,7 @@ namespace PersonalLibrary.Api.Migrations
 
                     b.HasIndex("SenderId");
 
-                    b.ToTable("FriendRequests");
+                    b.ToTable("FriendRequests", (string)null);
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.User", b =>
@@ -175,7 +175,7 @@ namespace PersonalLibrary.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.UserBook", b =>
@@ -202,7 +202,7 @@ namespace PersonalLibrary.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserBooks");
+                    b.ToTable("UserBooks", (string)null);
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.BookRating", b =>

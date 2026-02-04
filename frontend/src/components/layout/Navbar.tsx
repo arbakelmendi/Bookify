@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Search, BookOpen, Menu, X, LogIn, LogOut, User, Shield } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,20 +13,30 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 
-const navLinks = [
-  { name: "Discover", path: "/" },
-  { name: "My Library", path: "/library" },
-  { name: "Dashboard", path: "/dashboard" },
-  { name: "Friends", path: "/friends" },
-  { name: "Import", path: "/import" }, 
-];
-
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
+
+  // Dynamic nav links based on authentication and role
+  const getNavLinks = () => {
+    const links = [{ name: "Discover", path: "/" }];
+
+    if (isAuthenticated) {
+      links.push(
+        { name: "My Library", path: "/library" },
+        { name: "Progress", path: "/dashboard" }
+      );
+
+      links.push({ name: "Friends", path: "/friends" });
+    }
+
+    return links;
+  };
+
+  const navLinks = getNavLinks();
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -159,7 +168,7 @@ export const Navbar = () => {
             ) : (
               <div className="flex items-center gap-2">
                 <Button variant="ghost" onClick={() => navigate("/login")}>
-                  Sign In
+                  Login
                 </Button>
                 <Button onClick={() => navigate("/signup")}>
                   <LogIn className="w-4 h-4 mr-2" />
