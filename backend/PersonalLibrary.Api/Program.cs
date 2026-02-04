@@ -1,41 +1,35 @@
-
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using PersonalLibrary.Api.Modules.Ratings;
+using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 using PersonalLibrary.Api.Data;
 using PersonalLibrary.Api.Models;
 using PersonalLibrary.Api.Modules.Auth;
-using PersonalLibrary.Api.Modules.Friends;
-using PersonalLibrary.Api.Modules.Reading;
 using PersonalLibrary.Api.Modules.Authors;
 using PersonalLibrary.Api.Modules.Categories;
-using Microsoft.Extensions.Logging;
+using PersonalLibrary.Api.Modules.Friends;
+using PersonalLibrary.Api.Modules.Ratings;
+using PersonalLibrary.Api.Modules.Reading;
+using System.Text;
+using PersonalLibrary.Api.Modules.Recommendations;
+using PersonalLibrary.Api.Modules.Notifications;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Controllers + Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("Frontend", p =>
-        p.WithOrigins(
-            "http://localhost:8080",
-            "http://localhost:5173",
-            "https://localhost:5173"
-        )
-        .AllowAnyHeader()
-        .AllowAnyMethod()
-        .AllowCredentials()
-    );
-});
+
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new() 
-    { 
-        Title = "PersonalLibrary.Api", 
-        Version = "v1" 
+    c.SwaggerDoc("v1", new()
+    {
+        Title = "PersonalLibrary.Api",
+        Version = "v1"
     });
 
+    // Swagger Bearer
     c.AddSecurityDefinition("Bearer", new()
     {
         Name = "Authorization",
@@ -61,29 +55,75 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
+
+// CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", p =>
+        p.WithOrigins(
+                "http://localhost:8080",
+                "http://localhost:5173",
+                "https://localhost:5173"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials()
+    );
+});
+
+// DI Services
 builder.Services.AddScoped<FriendService>();
 builder.Services.AddScoped<ReadingService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<RatingsService>();
 builder.Services.AddScoped<AuthorsService>();
 builder.Services.AddScoped<CategoriesService>();
-
+builder.Services.AddScoped<RecommendationService>();
+builder.Services.AddScoped<NotificationService>();
+// DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-
+// HttpClient
 builder.Services.AddHttpClient<PersonalLibrary.Api.Services.GoogleBooksService>();
 
+// ✅ JWT Authentication + Authorization
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
 
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
+        )
+    };
+});
+
+builder.Services.AddAuthorization();
+
+Console.WriteLine("ENV: " + builder.Environment.EnvironmentName);
+Console.WriteLine("JWT Issuer: " + builder.Configuration["Jwt:Issuer"]);
+Console.WriteLine("JWT Audience: " + builder.Configuration["Jwt:Audience"]);
+Console.WriteLine("JWT Key length: " + (builder.Configuration["Jwt:Key"]?.Length ?? 0));
 var app = builder.Build();
 
-// Seed admin user
+// ✅ Seed admin user
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var context = services.GetRequiredService<AppDbContext>();
 
-    // Check if admin user exists
     var adminEmail = "admin@bookify.com";
     var adminExists = await context.Users.AnyAsync(u => u.Email.ToLower() == adminEmail.ToLower());
 
@@ -102,6 +142,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// ✅ Seed books (dev only)
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
@@ -127,7 +168,7 @@ if (app.Environment.IsDevelopment())
     }
 }
 
-// Configure the HTTP request pipeline.
+// Middleware pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -138,7 +179,8 @@ app.UseHttpsRedirection();
 
 app.UseCors("Frontend");
 
-// Auth disabled
+app.UseAuthentication(); // ✅ MUST be before UseAuthorization
+app.UseAuthorization();
 
 app.MapControllers();
 

@@ -5,6 +5,7 @@ using PersonalLibrary.Api.Modules.Friends.Dtos;
 
 namespace PersonalLibrary.Api.Modules.Friends;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class FriendsController : ControllerBase
@@ -16,7 +17,7 @@ public class FriendsController : ControllerBase
         _service = service;
     }
 
-    // GET: /api/Friends/incoming
+    // GET: /api/Friends/incoming  (Pending only)
     [HttpGet("incoming")]
     public async Task<IActionResult> Incoming()
     {
@@ -25,7 +26,7 @@ public class FriendsController : ControllerBase
         return Ok(data);
     }
 
-    // GET: /api/Friends/outgoing
+    // GET: /api/Friends/outgoing (Pending only)
     [HttpGet("outgoing")]
     public async Task<IActionResult> Outgoing()
     {
@@ -34,7 +35,7 @@ public class FriendsController : ControllerBase
         return Ok(data);
     }
 
-    // GET: /api/Friends/list
+    // GET: /api/Friends/list (Accepted friends)
     [HttpGet("list")]
     public async Task<IActionResult> FriendsList()
     {
@@ -49,9 +50,24 @@ public class FriendsController : ControllerBase
     {
         var userId = GetUserId();
         var (ok, error, data) = await _service.SendRequestAsync(userId, dto.ReceiverId);
-        if (!ok) return BadRequest(new { message = error });
 
-        return CreatedAtAction(nameof(Incoming), new { }, data);
+        if (!ok)
+        {
+            // 409: duplicates / already friends
+            if (error.Contains("already", StringComparison.OrdinalIgnoreCase) ||
+                error.Contains("pending", StringComparison.OrdinalIgnoreCase))
+                return Conflict(new { message = error });
+
+            // 404: receiver not found
+            if (error.Contains("not found", StringComparison.OrdinalIgnoreCase))
+                return NotFound(new { message = error });
+
+            // 400: self-request or validation
+            return BadRequest(new { message = error });
+        }
+
+        // simplest: return created object
+        return Ok(data);
     }
 
     // POST: /api/Friends/accept/{requestId}
@@ -60,7 +76,17 @@ public class FriendsController : ControllerBase
     {
         var userId = GetUserId();
         var (ok, error) = await _service.AcceptAsync(userId, requestId);
-        if (!ok) return BadRequest(new { message = error });
+
+        if (!ok)
+        {
+            if (error.Contains("not found", StringComparison.OrdinalIgnoreCase))
+                return NotFound(new { message = error });
+
+            if (error.Contains("not allowed", StringComparison.OrdinalIgnoreCase))
+                return Forbid();
+
+            return BadRequest(new { message = error });
+        }
 
         return NoContent();
     }
@@ -71,7 +97,17 @@ public class FriendsController : ControllerBase
     {
         var userId = GetUserId();
         var (ok, error) = await _service.RejectAsync(userId, requestId);
-        if (!ok) return BadRequest(new { message = error });
+
+        if (!ok)
+        {
+            if (error.Contains("not found", StringComparison.OrdinalIgnoreCase))
+                return NotFound(new { message = error });
+
+            if (error.Contains("not allowed", StringComparison.OrdinalIgnoreCase))
+                return Forbid();
+
+            return BadRequest(new { message = error });
+        }
 
         return NoContent();
     }
@@ -82,7 +118,17 @@ public class FriendsController : ControllerBase
     {
         var userId = GetUserId();
         var (ok, error) = await _service.CancelAsync(userId, requestId);
-        if (!ok) return BadRequest(new { message = error });
+
+        if (!ok)
+        {
+            if (error.Contains("not found", StringComparison.OrdinalIgnoreCase))
+                return NotFound(new { message = error });
+
+            if (error.Contains("not allowed", StringComparison.OrdinalIgnoreCase))
+                return Forbid();
+
+            return BadRequest(new { message = error });
+        }
 
         return NoContent();
     }
@@ -93,14 +139,20 @@ public class FriendsController : ControllerBase
     {
         var userId = GetUserId();
         var (ok, error) = await _service.RemoveFriendAsync(userId, friendId);
-        if (!ok) return BadRequest(new { message = error });
+
+        if (!ok)
+        {
+            if (error.Contains("not found", StringComparison.OrdinalIgnoreCase))
+                return NotFound(new { message = error });
+
+            return BadRequest(new { message = error });
+        }
 
         return NoContent();
     }
 
     private int GetUserId()
     {
-        // Prefer NameIdentifier, fallback to "sub"
         var idStr =
             User.FindFirstValue(ClaimTypes.NameIdentifier) ??
             User.FindFirstValue("sub");

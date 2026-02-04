@@ -1,49 +1,83 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Users, UserPlus, Search, Filter, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { mockFriends, mockBooks } from "@/data/mockData";
-import { FriendCard } from "@/components/friends/FriendCard";
 import { AddFriendDialog } from "@/components/friends/AddFriendDialog";
-import { useNavigate } from "react-router-dom";
+import { friendsApi } from "@/api/friends";
+
+type FriendUser = { id: number; email: string };
+type FriendRequestDto = {
+  id: number;
+  senderId: number;
+  receiverId: number;
+  status: string;
+  createdAt: string;
+  respondedAt?: string | null;
+};
 
 const Friends = () => {
-  const navigate = useNavigate();
-  const [friends] = useState(mockFriends);
   const [searchQuery, setSearchQuery] = useState("");
   const [addFriendOpen, setAddFriendOpen] = useState(false);
 
-  // Mock friend requests
-  const friendRequests = [
-    {
-      id: "10",
-      name: "Sophie Turner",
-      avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop",
-      mutualFriends: 4
-    },
-    {
-      id: "11",
-      name: "James Wilson",
-      avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop",
-      mutualFriends: 2
+  const [friends, setFriends] = useState<FriendUser[]>([]);
+  const [incoming, setIncoming] = useState<FriendRequestDto[]>([]);
+  const [outgoing, setOutgoing] = useState<FriendRequestDto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  const loadAll = async () => {
+    try {
+      setErr(null);
+      setLoading(true);
+      const [f, inc, out] = await Promise.all([
+        friendsApi.list(),
+        friendsApi.incoming(),
+        friendsApi.outgoing(),
+      ]);
+      setFriends(f);
+      setIncoming(inc);
+      setOutgoing(out);
+    } catch (e: any) {
+      setErr(e?.response?.data?.message ?? "Failed to load friends data.");
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
-  // Mock activity feed
-  const activityFeed = [
-    { friend: mockFriends[0], type: "finished", book: mockBooks[0], time: "2 hours ago" },
-    { friend: mockFriends[1], type: "started", book: mockBooks[3], time: "5 hours ago" },
-    { friend: mockFriends[2], type: "reviewed", book: mockBooks[1], time: "1 day ago", rating: 5 },
-    { friend: mockFriends[3], type: "added", book: mockBooks[5], time: "2 days ago" },
-    { friend: mockFriends[0], type: "finished", book: mockBooks[7], time: "3 days ago" },
-  ];
+  useEffect(() => {
+    loadAll();
+  }, []);
 
-  const filteredFriends = friends.filter(friend =>
-    friend.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredFriends = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return friends;
+    return friends.filter((f) => (f.email ?? "").toLowerCase().includes(q));
+  }, [friends, searchQuery]);
+
+  const pendingCount = incoming.length;
+
+  const accept = async (id: number) => {
+    await friendsApi.accept(id);
+    await loadAll();
+  };
+
+  const reject = async (id: number) => {
+    await friendsApi.reject(id);
+    await loadAll();
+  };
+
+  const cancel = async (id: number) => {
+    await friendsApi.cancel(id);
+    await loadAll();
+  };
+
+  const removeFriend = async (friendId: number) => {
+    await friendsApi.remove(friendId);
+    await loadAll();
+  };
 
   return (
     <div className="min-h-screen py-8">
@@ -59,25 +93,34 @@ const Friends = () => {
               Friends
             </h1>
             <p className="text-muted-foreground">
-              See what your friends are reading and discover new books together
+              Manage friends, requests, and connect with others.
             </p>
           </div>
+
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-2 relative">
+            <Button variant="outline" className="gap-2 relative" onClick={() => {}}>
               <Bell className="w-4 h-4" />
               Requests
-              {friendRequests.length > 0 && (
+              {pendingCount > 0 && (
                 <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                  {friendRequests.length}
+                  {pendingCount}
                 </Badge>
               )}
             </Button>
+
             <Button className="gap-2" onClick={() => setAddFriendOpen(true)}>
               <UserPlus className="w-4 h-4" />
               Add Friend
             </Button>
           </div>
         </motion.div>
+
+        {/* Error / Loading */}
+        {err && (
+          <div className="mb-6 p-3 rounded-md border border-destructive/30 bg-destructive/10 text-destructive">
+            {err}
+          </div>
+        )}
 
         {/* Search */}
         <motion.div
@@ -90,13 +133,13 @@ const Friends = () => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Search friends..."
+                placeholder="Search friends by email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <Button variant="outline" size="icon">
+            <Button variant="outline" size="icon" onClick={() => {}}>
               <Filter className="w-4 h-4" />
             </Button>
           </div>
@@ -108,131 +151,174 @@ const Friends = () => {
               <Users className="w-4 h-4" />
               Friends ({friends.length})
             </TabsTrigger>
-            <TabsTrigger value="activity">Activity Feed</TabsTrigger>
+
             <TabsTrigger value="requests" className="gap-2">
               Requests
-              {friendRequests.length > 0 && (
+              {pendingCount > 0 && (
                 <Badge variant="secondary" className="ml-1">
-                  {friendRequests.length}
+                  {pendingCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+
+            <TabsTrigger value="outgoing" className="gap-2">
+              Outgoing
+              {outgoing.length > 0 && (
+                <Badge variant="secondary" className="ml-1">
+                  {outgoing.length}
                 </Badge>
               )}
             </TabsTrigger>
           </TabsList>
 
+          {/* FRIENDS TAB */}
           <TabsContent value="friends">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredFriends.map((friend, index) => (
-                <FriendCard key={friend.id} friend={friend} index={index} />
-              ))}
-            </div>
+            {loading ? (
+              <div className="text-muted-foreground">Loading...</div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredFriends.map((f) => (
+                    <div
+                      key={f.id}
+                      className="p-4 bg-card border border-border rounded-lg flex items-center justify-between gap-3"
+                    >
+                      <div>
+                        <p className="font-medium text-foreground">{f.email}</p>
+                        <p className="text-sm text-muted-foreground">User #{f.id}</p>
+                      </div>
 
-            {filteredFriends.length === 0 && (
-              <div className="text-center py-12">
-                <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-foreground mb-2">No friends found</h3>
-                <p className="text-muted-foreground mb-4">
-                  {searchQuery ? `No friends matching "${searchQuery}"` : "Start by adding some friends!"}
-                </p>
-                <Button onClick={() => setAddFriendOpen(true)}>
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Add Friend
-                </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => removeFriend(f.id)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+
+                {filteredFriends.length === 0 && (
+                  <div className="text-center py-12">
+                    <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-foreground mb-2">
+                      No friends found
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
+                      {searchQuery
+                        ? `No friends matching "${searchQuery}"`
+                        : "Start by adding some friends!"}
+                    </p>
+                    <Button onClick={() => setAddFriendOpen(true)}>
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Add Friend
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
+
+          {/* REQUESTS TAB (incoming) */}
+          <TabsContent value="requests">
+            {loading ? (
+              <div className="text-muted-foreground">Loading...</div>
+            ) : (
+              <div className="space-y-4 max-w-2xl">
+                {incoming.length > 0 ? (
+                  incoming.map((r, index) => (
+                    <motion.div
+                      key={r.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="flex items-center gap-4 p-4 bg-card border border-border rounded-lg"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium text-foreground">
+                          From user #{r.senderId}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Request ID: {r.id}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => accept(r.id)}>
+                          Accept
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => reject(r.id)}>
+                          Decline
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))
+                ) : (
+                  <div className="text-center py-12">
+                    <Bell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-foreground mb-2">
+                      No pending requests
+                    </h3>
+                    <p className="text-muted-foreground">
+                      When someone sends you a friend request, it will appear here.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>
 
-          <TabsContent value="activity">
-            <div className="space-y-4 max-w-2xl">
-              {activityFeed.map((activity, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="flex gap-4 p-4 bg-card border border-border rounded-lg hover:border-primary/30 transition-colors"
-                >
-                  <img
-                    src={activity.friend.avatar}
-                    alt={activity.friend.name}
-                    className="w-10 h-10 rounded-full object-cover cursor-pointer hover:opacity-80"
-                    onClick={() => navigate(`/friend/${activity.friend.id}`)}
-                  />
-                  <div className="flex-1">
-                    <p className="text-foreground">
-                      <span 
-                        className="font-medium hover:text-primary cursor-pointer"
-                        onClick={() => navigate(`/friend/${activity.friend.id}`)}
-                      >
-                        {activity.friend.name}
-                      </span>
-                      {activity.type === "finished" && " finished reading "}
-                      {activity.type === "started" && " started reading "}
-                      {activity.type === "reviewed" && " reviewed "}
-                      {activity.type === "added" && " added "}
-                      <span 
-                        className="font-medium text-primary cursor-pointer hover:underline"
-                        onClick={() => navigate(`/books/${activity.book.id}`)}
-                      >
-                        {activity.book.title}
-                      </span>
-                      {activity.type === "added" && " to their shelf"}
+          {/* OUTGOING TAB */}
+          <TabsContent value="outgoing">
+            {loading ? (
+              <div className="text-muted-foreground">Loading...</div>
+            ) : (
+              <div className="space-y-4 max-w-2xl">
+                {outgoing.length > 0 ? (
+                  outgoing.map((r, index) => (
+                    <motion.div
+                      key={r.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="flex items-center gap-4 p-4 bg-card border border-border rounded-lg"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium text-foreground">
+                          To user #{r.receiverId}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Request ID: {r.id}
+                        </p>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => cancel(r.id)}>
+                        Cancel
+                      </Button>
+                    </motion.div>
+                  ))
+                ) : (
+                  <div className="text-center py-12">
+                    <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-foreground mb-2">
+                      No outgoing requests
+                    </h3>
+                    <p className="text-muted-foreground">
+                      Requests you send will appear here until accepted or rejected.
                     </p>
-                    <p className="text-sm text-muted-foreground mt-1">{activity.time}</p>
                   </div>
-                  <img
-                    src={activity.book.cover}
-                    alt={activity.book.title}
-                    className="w-10 h-14 rounded object-cover cursor-pointer hover:opacity-80"
-                    onClick={() => navigate(`/books/${activity.book.id}`)}
-                  />
-                </motion.div>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="requests">
-            <div className="space-y-4 max-w-2xl">
-              {friendRequests.length > 0 ? (
-                friendRequests.map((request, index) => (
-                  <motion.div
-                    key={request.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="flex items-center gap-4 p-4 bg-card border border-border rounded-lg"
-                  >
-                    <img
-                      src={request.avatar}
-                      alt={request.name}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium text-foreground">{request.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {request.mutualFriends} mutual friends
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm">Accept</Button>
-                      <Button size="sm" variant="outline">Decline</Button>
-                    </div>
-                  </motion.div>
-                ))
-              ) : (
-                <div className="text-center py-12">
-                  <Bell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-foreground mb-2">No pending requests</h3>
-                  <p className="text-muted-foreground">
-                    When someone sends you a friend request, it will appear here.
-                  </p>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
 
-      <AddFriendDialog open={addFriendOpen} onOpenChange={setAddFriendOpen} />
+      <AddFriendDialog
+        open={addFriendOpen}
+        onOpenChange={setAddFriendOpen}
+        // shumë e rëndësishme: pas suksesit, rifresko
+        onSuccess={loadAll as any}
+      />
     </div>
   );
 };

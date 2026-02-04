@@ -10,24 +10,29 @@ public class AppDbContext : DbContext
     public DbSet<Book> Books => Set<Book>();
     public DbSet<User> Users => Set<User>();
     public DbSet<FriendRequest> FriendRequests => Set<FriendRequest>();
-
     public DbSet<BookRating> BookRatings => Set<BookRating>();
-
-
     public DbSet<UserBook> UserBooks => Set<UserBook>();
     public DbSet<Author> Authors => Set<Author>();
-
     public DbSet<Category> Categories => Set<Category>();
+    public DbSet<BookRecommendation> BookRecommendations => Set<BookRecommendation>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
 
+        // BookRating unique: 1 user -> 1 rating per book
         modelBuilder.Entity<BookRating>()
             .HasIndex(br => new { br.UserId, br.BookId })
             .IsUnique();
 
+        // Prevent duplicate pending friend requests (same sender -> receiver)
+        modelBuilder.Entity<FriendRequest>()
+            .HasIndex(fr => new { fr.SenderId, fr.ReceiverId })
+            .IsUnique()
+            .HasFilter("[Status] = 'Pending'"); // SQL Server filtered index
 
-        base.OnModelCreating(modelBuilder);
-
+        // FriendRequest relationships
         modelBuilder.Entity<FriendRequest>()
             .HasOne(fr => fr.Sender)
             .WithMany()
@@ -39,5 +44,31 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(fr => fr.ReceiverId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // BookRecommendation relationships
+        modelBuilder.Entity<BookRecommendation>()
+            .HasOne(r => r.FromUser)
+            .WithMany()
+            .HasForeignKey(r => r.FromUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<BookRecommendation>()
+            .HasOne(r => r.ToUser)
+            .WithMany()
+            .HasForeignKey(r => r.ToUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<BookRecommendation>()
+            .HasOne(r => r.Book)
+            .WithMany()
+            .HasForeignKey(r => r.BookId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Notification>()
+            .HasOne(n => n.User)
+            .WithMany()
+            .HasForeignKey(n => n.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
     }
 }

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PersonalLibrary.Api.Data;
 
@@ -11,9 +12,11 @@ using PersonalLibrary.Api.Data;
 namespace PersonalLibrary.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260204123050_AddUniquePendingFriendRequestIndex")]
+    partial class AddUniquePendingFriendRequestIndex
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -99,40 +102,6 @@ namespace PersonalLibrary.Api.Migrations
                     b.ToTable("BookRatings");
                 });
 
-            modelBuilder.Entity("PersonalLibrary.Api.Models.BookRecommendation", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("BookId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("FromUserId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Message")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("ToUserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BookId");
-
-                    b.HasIndex("FromUserId");
-
-                    b.HasIndex("ToUserId");
-
-                    b.ToTable("BookRecommendations");
-                });
-
             modelBuilder.Entity("PersonalLibrary.Api.Models.Category", b =>
                 {
                     b.Property<int>("Id")
@@ -183,57 +152,6 @@ namespace PersonalLibrary.Api.Migrations
                         .HasFilter("[Status] = 'Pending'");
 
                     b.ToTable("FriendRequests");
-                });
-
-            modelBuilder.Entity("PersonalLibrary.Api.Models.Notification", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("BookId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("FriendRequestId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("FromUserId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("ReadAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("RecommendationId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.User", b =>
@@ -311,33 +229,6 @@ namespace PersonalLibrary.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("PersonalLibrary.Api.Models.BookRecommendation", b =>
-                {
-                    b.HasOne("PersonalLibrary.Api.Models.Book", "Book")
-                        .WithMany()
-                        .HasForeignKey("BookId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("PersonalLibrary.Api.Models.User", "FromUser")
-                        .WithMany()
-                        .HasForeignKey("FromUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("PersonalLibrary.Api.Models.User", "ToUser")
-                        .WithMany()
-                        .HasForeignKey("ToUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Book");
-
-                    b.Navigation("FromUser");
-
-                    b.Navigation("ToUser");
-                });
-
             modelBuilder.Entity("PersonalLibrary.Api.Models.FriendRequest", b =>
                 {
                     b.HasOne("PersonalLibrary.Api.Models.User", "Receiver")
@@ -355,17 +246,6 @@ namespace PersonalLibrary.Api.Migrations
                     b.Navigation("Receiver");
 
                     b.Navigation("Sender");
-                });
-
-            modelBuilder.Entity("PersonalLibrary.Api.Models.Notification", b =>
-                {
-                    b.HasOne("PersonalLibrary.Api.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.UserBook", b =>
