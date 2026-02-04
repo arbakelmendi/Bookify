@@ -39,21 +39,15 @@ type FriendRequestDto = {
   respondedAt?: string | null;
 };
 
-export const AddFriendDialog = ({
-  open,
-  onOpenChange,
-  onSuccess,
-}: AddFriendDialogProps) => {
+export const AddFriendDialog = ({ open, onOpenChange, onSuccess }: AddFriendDialogProps) => {
   const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<UserSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // për spinner te butonat (id e userit për të cilin po bëhet veprimi)
   const [busyUserId, setBusyUserId] = useState<number | null>(null);
 
-  // reset kur mbyllet dialogu
   useEffect(() => {
     if (!open) {
       setSearchQuery("");
@@ -63,7 +57,6 @@ export const AddFriendDialog = ({
     }
   }, [open]);
 
-  // Search users (debounce)
   useEffect(() => {
     if (!open) return;
 
@@ -95,7 +88,6 @@ export const AddFriendDialog = ({
   const filteredResults = useMemo(() => results, [results]);
 
   const refreshSearchRow = async (q: string) => {
-    // rifresko listën (opsionale, por e bën UI-në menjëherë korrekt)
     if (q.trim().length < 2) return;
     const data: UserSearchResult[] = await usersApi.search(q.trim());
     setResults(data);
@@ -204,7 +196,8 @@ export const AddFriendDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      {/* e rrita pak width që me pas vend për 2 butona */}
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="w-5 h-5" />
@@ -216,13 +209,14 @@ export const AddFriendDialog = ({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search by email or username..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 pr-10"
             />
             {loading && (
               <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
@@ -232,117 +226,130 @@ export const AddFriendDialog = ({
           <div className="space-y-2">
             <p className="text-sm font-medium text-foreground">Search Results</p>
 
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            {/* pr-1 që scrollbar mos me “hajt” layout */}
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
               {filteredResults.map((user) => {
                 const busy = busyUserId === user.id;
 
                 return (
                   <div
                     key={user.id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-card border border-border hover:bg-accent/50 transition-colors"
+                    className="w-full rounded-lg bg-card border border-border p-3"
                   >
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center font-medium text-foreground">
-                      {(user.username?.[0] ?? user.email?.[0] ?? "U").toUpperCase()}
-                    </div>
+                    {/* rreshti kryesor */}
+                    <div className="flex items-center gap-3 w-full">
+                      {/* avatar */}
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center font-medium text-foreground shrink-0">
+                        {(user.username?.[0] ?? user.email?.[0] ?? "U").toUpperCase()}
+                      </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-foreground truncate">
-                          {user.username || "—"}
+                      {/* text */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <p className="font-medium text-foreground truncate">
+                            {user.username || "—"}
+                          </p>
+
+                          {user.relationship === "FRIEND" && (
+                            <Badge variant="secondary" className="shrink-0">
+                              Friends
+                            </Badge>
+                          )}
+                          {user.relationship === "OUTGOING" && (
+                            <Badge variant="secondary" className="shrink-0">
+                              Pending
+                            </Badge>
+                          )}
+                          {user.relationship === "INCOMING" && (
+                            <Badge variant="secondary" className="shrink-0">
+                              Requested you
+                            </Badge>
+                          )}
+                        </div>
+
+                        <p className="text-sm text-muted-foreground truncate">
+                          {user.email} • ID #{user.id}
                         </p>
+                      </div>
+
+                      {/* actions - gjithmonë në të djathtë, mos me u ngjesh */}
+                      <div className="shrink-0 flex items-center gap-2">
+                        {user.relationship === "NONE" && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleSendRequest(user)}
+                            className="gap-1 min-w-[96px]"
+                            disabled={busy}
+                          >
+                            {busy ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <UserPlus className="w-4 h-4" />
+                            )}
+                            Add
+                          </Button>
+                        )}
+
+                        {user.relationship === "OUTGOING" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleCancelRequest(user)}
+                            className="gap-1 min-w-[110px]"
+                            disabled={busy}
+                          >
+                            {busy ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <X className="w-4 h-4" />
+                            )}
+                            Cancel
+                          </Button>
+                        )}
+
+                        {user.relationship === "INCOMING" && (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => handleAccept(user)}
+                              disabled={busy}
+                              className="gap-1 min-w-[96px]"
+                            >
+                              {busy ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Check className="w-4 h-4" />
+                              )}
+                              Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDecline(user)}
+                              disabled={busy}
+                              className="min-w-[96px]"
+                            >
+                              Decline
+                            </Button>
+                          </>
+                        )}
 
                         {user.relationship === "FRIEND" && (
-                          <Badge variant="secondary">Friends</Badge>
-                        )}
-                        {user.relationship === "OUTGOING" && (
-                          <Badge variant="secondary">Pending</Badge>
-                        )}
-                        {user.relationship === "INCOMING" && (
-                          <Badge variant="secondary">Requested you</Badge>
+                          <Button size="sm" variant="secondary" disabled className="min-w-[110px]">
+                            Friends
+                          </Button>
                         )}
                       </div>
-
-                      <p className="text-sm text-muted-foreground truncate">
-                        {user.email} • ID #{user.id}
-                      </p>
                     </div>
-
-                    {/* Actions */}
-                    {user.relationship === "NONE" && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleSendRequest(user)}
-                        className="gap-1"
-                        disabled={busy}
-                      >
-                        {busy ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <UserPlus className="w-3 h-3" />
-                        )}
-                        Add
-                      </Button>
-                    )}
-
-                    {user.relationship === "OUTGOING" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleCancelRequest(user)}
-                        className="gap-1"
-                        disabled={busy}
-                      >
-                        {busy ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <X className="w-3 h-3" />
-                        )}
-                        Cancel
-                      </Button>
-                    )}
-
-                    {user.relationship === "INCOMING" && (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => handleAccept(user)}
-                          disabled={busy}
-                          className="gap-1"
-                        >
-                          {busy ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Check className="w-3 h-3" />
-                          )}
-                          Accept
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDecline(user)}
-                          disabled={busy}
-                        >
-                          Decline
-                        </Button>
-                      </div>
-                    )}
-
-                    {user.relationship === "FRIEND" && (
-                      <Button size="sm" variant="secondary" disabled>
-                        Friends
-                      </Button>
-                    )}
                   </div>
                 );
               })}
 
-              {!loading &&
-                searchQuery.trim().length >= 2 &&
-                filteredResults.length === 0 && (
-                  <p className="text-center text-muted-foreground py-4">
-                    No users found matching "{searchQuery}"
-                  </p>
-                )}
+              {!loading && searchQuery.trim().length >= 2 && filteredResults.length === 0 && (
+                <p className="text-center text-muted-foreground py-4">
+                  No users found matching "{searchQuery}"
+                </p>
+              )}
 
               {searchQuery.trim().length < 2 && (
                 <p className="text-center text-muted-foreground py-4">
