@@ -139,16 +139,39 @@ public class UsersController : ControllerBase
 
     // Admin only: delete user
     // DELETE /api/Users/5
-    [HttpDelete("{id:int}")]
-    [Authorize(Roles = "admin")]
-    public async Task<IActionResult> Delete(int id)
-    {
-        var user = await _context.Users.FindAsync(id);
-        if (user == null) return NotFound(new { message = "User not found." });
+    // Admin only: delete user (and cleanup dependencies)
+[HttpDelete("{id:int}")]
+[Authorize(Roles = "admin")]
+public async Task<IActionResult> Delete(int id)
+{
+    var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
+    if (user == null) return NotFound(new { message = "User not found." });
 
-        _context.Users.Remove(user);
-        await _context.SaveChangesAsync();
+    var friendRequests = await _context.FriendRequests
+        .Where(fr => fr.SenderId == id || fr.ReceiverId == id)
+        .ToListAsync();
 
-        return NoContent();
-    }
+    if (friendRequests.Count > 0)
+        _context.FriendRequests.RemoveRange(friendRequests);
+
+    var ratings = await _context.BookRatings
+        .Where(br => br.UserId == id)
+        .ToListAsync();
+
+    if (ratings.Count > 0)
+        _context.BookRatings.RemoveRange(ratings);
+
+    var userBooks = await _context.UserBooks
+        .Where(ub => ub.UserId == id)
+        .ToListAsync();
+
+    if (userBooks.Count > 0)
+        _context.UserBooks.RemoveRange(userBooks);
+
+    _context.Users.Remove(user);
+
+    await _context.SaveChangesAsync();
+    return NoContent();
+}
+
 }
