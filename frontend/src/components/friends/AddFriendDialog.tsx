@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, UserPlus, X, Loader2 } from "lucide-react";
+import { Search, UserPlus, X, Loader2, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,12 +9,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { usersApi } from "../../api/users";
 import { friendsApi } from "../../api/friends";
-
-
-
 
 interface AddFriendDialogProps {
   open: boolean;
@@ -22,11 +20,14 @@ interface AddFriendDialogProps {
   onSuccess?: () => void;
 }
 
+type Relationship = "NONE" | "INCOMING" | "OUTGOING" | "FRIEND";
+
 type UserSearchResult = {
   id: number;
   email: string;
   username: string;
-  role?: string;
+  relationship: Relationship;
+  requestId?: number | null;
 };
 
 type FriendRequestDto = {
@@ -49,22 +50,20 @@ export const AddFriendDialog = ({
   const [results, setResults] = useState<UserSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // map receiverUserId -> requestId (so we can cancel)
-  const [pendingRequestIds, setPendingRequestIds] = useState<Record<number, number>>({});
-  const [sendingForUserId, setSendingForUserId] = useState<number | null>(null);
+  // për spinner te butonat (id e userit për të cilin po bëhet veprimi)
+  const [busyUserId, setBusyUserId] = useState<number | null>(null);
 
-  // reset when closing
+  // reset kur mbyllet dialogu
   useEffect(() => {
     if (!open) {
       setSearchQuery("");
       setResults([]);
       setLoading(false);
-      setSendingForUserId(null);
-      setPendingRequestIds({});
+      setBusyUserId(null);
     }
   }, [open]);
 
-  // Search users (debounced light)
+  // Search users (debounce)
   useEffect(() => {
     if (!open) return;
 
@@ -77,7 +76,7 @@ export const AddFriendDialog = ({
     const t = setTimeout(async () => {
       try {
         setLoading(true);
-        const data = await usersApi.search(q);
+        const data: UserSearchResult[] = await usersApi.search(q);
         setResults(data);
       } catch (e: any) {
         toast({
@@ -93,20 +92,19 @@ export const AddFriendDialog = ({
     return () => clearTimeout(t);
   }, [searchQuery, open, toast]);
 
-  const filteredResults = useMemo(() => {
-    // if you want to show "suggested" when empty, keep empty list for now
-    return results;
-  }, [results]);
+  const filteredResults = useMemo(() => results, [results]);
+
+  const refreshSearchRow = async (q: string) => {
+    // rifresko listën (opsionale, por e bën UI-në menjëherë korrekt)
+    if (q.trim().length < 2) return;
+    const data: UserSearchResult[] = await usersApi.search(q.trim());
+    setResults(data);
+  };
 
   const handleSendRequest = async (user: UserSearchResult) => {
     try {
-      setSendingForUserId(user.id);
-      const dto: FriendRequestDto = await friendsApi.sendRequest(user.id);
-
-      setPendingRequestIds((prev) => ({
-        ...prev,
-        [user.id]: dto.id,
-      }));
+      setBusyUserId(user.id);
+      await friendsApi.sendRequest(user.id);
 
       toast({
         title: "Friend request sent!",
@@ -114,6 +112,7 @@ export const AddFriendDialog = ({
       });
 
       onSuccess?.();
+      await refreshSearchRow(searchQuery);
     } catch (e: any) {
       toast({
         title: "Could not send request",
@@ -121,23 +120,17 @@ export const AddFriendDialog = ({
         variant: "destructive",
       });
     } finally {
-      setSendingForUserId(null);
+      setBusyUserId(null);
     }
   };
 
-  const handleCancelRequest = async (receiverUserId: number) => {
-    const requestId = pendingRequestIds[receiverUserId];
+  const handleCancelRequest = async (user: UserSearchResult) => {
+    const requestId = user.requestId;
     if (!requestId) return;
 
     try {
-      setSendingForUserId(receiverUserId);
+      setBusyUserId(user.id);
       await friendsApi.cancel(requestId);
-
-      setPendingRequestIds((prev) => {
-        const copy = { ...prev };
-        delete copy[receiverUserId];
-        return copy;
-      });
 
       toast({
         title: "Request cancelled",
@@ -145,6 +138,7 @@ export const AddFriendDialog = ({
       });
 
       onSuccess?.();
+      await refreshSearchRow(searchQuery);
     } catch (e: any) {
       toast({
         title: "Could not cancel request",
@@ -152,7 +146,59 @@ export const AddFriendDialog = ({
         variant: "destructive",
       });
     } finally {
-      setSendingForUserId(null);
+      setBusyUserId(null);
+    }
+  };
+
+  const handleAccept = async (user: UserSearchResult) => {
+    const requestId = user.requestId;
+    if (!requestId) return;
+
+    try {
+      setBusyUserId(user.id);
+      await friendsApi.accept(requestId);
+
+      toast({
+        title: "Friend request accepted",
+        description: `You are now friends with ${user.username || user.email}.`,
+      });
+
+      onSuccess?.();
+      await refreshSearchRow(searchQuery);
+    } catch (e: any) {
+      toast({
+        title: "Could not accept request",
+        description: e?.response?.data?.message ?? "Something went wrong.",
+        variant: "destructive",
+      });
+    } finally {
+      setBusyUserId(null);
+    }
+  };
+
+  const handleDecline = async (user: UserSearchResult) => {
+    const requestId = user.requestId;
+    if (!requestId) return;
+
+    try {
+      setBusyUserId(user.id);
+      await friendsApi.reject(requestId);
+
+      toast({
+        title: "Request declined",
+        description: "Friend request has been declined.",
+      });
+
+      onSuccess?.();
+      await refreshSearchRow(searchQuery);
+    } catch (e: any) {
+      toast({
+        title: "Could not decline request",
+        description: e?.response?.data?.message ?? "Something went wrong.",
+        variant: "destructive",
+      });
+    } finally {
+      setBusyUserId(null);
     }
   };
 
@@ -165,13 +211,13 @@ export const AddFriendDialog = ({
             Add Friends
           </DialogTitle>
           <DialogDescription>
-            Search for users by email or username, then send a request.
+            Search users by email or username, then add/accept requests.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search by email or username..."
               value={searchQuery}
@@ -188,83 +234,121 @@ export const AddFriendDialog = ({
 
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {filteredResults.map((user) => {
-                const pending = !!pendingRequestIds[user.id];
-                const busy = sendingForUserId === user.id;
+                const busy = busyUserId === user.id;
 
                 return (
                   <div
                     key={user.id}
                     className="flex items-center gap-3 p-3 rounded-lg bg-card border border-border hover:bg-accent/50 transition-colors"
                   >
-                    {/* Simple avatar circle with initial */}
                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center font-medium text-foreground">
                       {(user.username?.[0] ?? user.email?.[0] ?? "U").toUpperCase()}
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">
-                        {user.username}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-foreground truncate">
+                          {user.username || "—"}
+                        </p>
+
+                        {user.relationship === "FRIEND" && (
+                          <Badge variant="secondary">Friends</Badge>
+                        )}
+                        {user.relationship === "OUTGOING" && (
+                          <Badge variant="secondary">Pending</Badge>
+                        )}
+                        {user.relationship === "INCOMING" && (
+                          <Badge variant="secondary">Requested you</Badge>
+                        )}
+                      </div>
+
                       <p className="text-sm text-muted-foreground truncate">
                         {user.email} • ID #{user.id}
                       </p>
                     </div>
 
-                    {pending ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleCancelRequest(user.id)}
-                        className="gap-1"
-                        disabled={busy}
-                      >
-                        {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
-                        Cancel
-                      </Button>
-                    ) : (
+                    {/* Actions */}
+                    {user.relationship === "NONE" && (
                       <Button
                         size="sm"
                         onClick={() => handleSendRequest(user)}
                         className="gap-1"
                         disabled={busy}
                       >
-                        {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserPlus className="w-3 h-3" />}
+                        {busy ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <UserPlus className="w-3 h-3" />
+                        )}
                         Add
+                      </Button>
+                    )}
+
+                    {user.relationship === "OUTGOING" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleCancelRequest(user)}
+                        className="gap-1"
+                        disabled={busy}
+                      >
+                        {busy ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <X className="w-3 h-3" />
+                        )}
+                        Cancel
+                      </Button>
+                    )}
+
+                    {user.relationship === "INCOMING" && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleAccept(user)}
+                          disabled={busy}
+                          className="gap-1"
+                        >
+                          {busy ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Check className="w-3 h-3" />
+                          )}
+                          Accept
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDecline(user)}
+                          disabled={busy}
+                        >
+                          Decline
+                        </Button>
+                      </div>
+                    )}
+
+                    {user.relationship === "FRIEND" && (
+                      <Button size="sm" variant="secondary" disabled>
+                        Friends
                       </Button>
                     )}
                   </div>
                 );
               })}
 
-              {!loading && searchQuery.trim().length >= 2 && filteredResults.length === 0 && (
-                <p className="text-center text-muted-foreground py-4">
-                  No users found matching "{searchQuery}"
-                </p>
-              )}
+              {!loading &&
+                searchQuery.trim().length >= 2 &&
+                filteredResults.length === 0 && (
+                  <p className="text-center text-muted-foreground py-4">
+                    No users found matching "{searchQuery}"
+                  </p>
+                )}
 
               {searchQuery.trim().length < 2 && (
                 <p className="text-center text-muted-foreground py-4">
                   Type at least 2 characters to search.
                 </p>
               )}
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-border">
-            <p className="text-sm text-muted-foreground text-center">
-              Share your profile link to invite friends
-            </p>
-            <div className="flex gap-2 mt-2">
-              <Input value="bookify.app/u/yourname" readOnly className="text-sm" />
-              <Button
-                variant="outline"
-                onClick={() => {
-                  navigator.clipboard.writeText("bookify.app/u/yourname");
-                  toast({ title: "Link copied!" });
-                }}
-              >
-                Copy
-              </Button>
             </div>
           </div>
         </div>

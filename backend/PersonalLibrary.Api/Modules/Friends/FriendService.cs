@@ -25,38 +25,49 @@ public class FriendService
     }
 
     // Pending incoming requests (that others sent to me)
-    public async Task<List<FriendRequestDto>> GetIncomingAsync(int userId)
-    {
-        return await _context.FriendRequests
-            .Where(fr => fr.ReceiverId == userId && fr.Status == FriendRequestStatuses.Pending)
-            .OrderByDescending(fr => fr.CreatedAt)
-            .Select(fr => new FriendRequestDto(
-                fr.Id,
-                fr.SenderId,
-                fr.ReceiverId,
-                fr.Status,
-                fr.CreatedAt,
-                fr.RespondedAt
-            ))
-            .ToListAsync();
-    }
+    public async Task<List<FriendRequestViewDto>> GetIncomingAsync(int userId)
+{
+    return await _context.FriendRequests
+        .AsNoTracking()
+        .Where(fr => fr.ReceiverId == userId && fr.Status == FriendRequestStatuses.Pending)
+        .OrderByDescending(fr => fr.CreatedAt)
+        .Select(fr => new FriendRequestViewDto(
+            fr.Id,
+            fr.SenderId,
+            fr.Sender.Email,
+            fr.Sender.Username,
+            fr.ReceiverId,
+            fr.Receiver.Email,
+            fr.Receiver.Username,
+            fr.Status,
+            fr.CreatedAt,
+            fr.RespondedAt
+        ))
+        .ToListAsync();
+}
 
-    // Pending outgoing requests (that I sent to others)
-    public async Task<List<FriendRequestDto>> GetOutgoingAsync(int userId)
-    {
-        return await _context.FriendRequests
-            .Where(fr => fr.SenderId == userId && fr.Status == FriendRequestStatuses.Pending)
-            .OrderByDescending(fr => fr.CreatedAt)
-            .Select(fr => new FriendRequestDto(
-                fr.Id,
-                fr.SenderId,
-                fr.ReceiverId,
-                fr.Status,
-                fr.CreatedAt,
-                fr.RespondedAt
-            ))
-            .ToListAsync();
-    }
+public async Task<List<FriendRequestViewDto>> GetOutgoingAsync(int userId)
+{
+    return await _context.FriendRequests
+        .AsNoTracking()
+        .Where(fr => fr.SenderId == userId && fr.Status == FriendRequestStatuses.Pending)
+        .OrderByDescending(fr => fr.CreatedAt)
+        .Select(fr => new FriendRequestViewDto(
+            fr.Id,
+            fr.SenderId,
+            fr.Sender.Email,
+            fr.Sender.Username,
+            fr.ReceiverId,
+            fr.Receiver.Email,
+            fr.Receiver.Username,
+            fr.Status,
+            fr.CreatedAt,
+            fr.RespondedAt
+        ))
+        .ToListAsync();
+}
+
+    
 
     // Accepted friends list
     public async Task<List<object>> GetFriendsAsync(int userId)

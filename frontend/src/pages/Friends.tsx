@@ -9,34 +9,49 @@ import { AddFriendDialog } from "@/components/friends/AddFriendDialog";
 import { friendsApi } from "@/api/friends";
 
 type FriendUser = { id: number; email: string };
-type FriendRequestDto = {
+
+type FriendRequestViewDto = {
   id: number;
+
   senderId: number;
+  senderEmail: string;
+  senderUsername: string;
+
   receiverId: number;
+  receiverEmail: string;
+  receiverUsername: string;
+
   status: string;
   createdAt: string;
   respondedAt?: string | null;
 };
 
+type TabValue = "friends" | "requests" | "outgoing";
+
 const Friends = () => {
+  const [tab, setTab] = useState<TabValue>("friends");
   const [searchQuery, setSearchQuery] = useState("");
   const [addFriendOpen, setAddFriendOpen] = useState(false);
 
   const [friends, setFriends] = useState<FriendUser[]>([]);
-  const [incoming, setIncoming] = useState<FriendRequestDto[]>([]);
-  const [outgoing, setOutgoing] = useState<FriendRequestDto[]>([]);
+  const [incoming, setIncoming] = useState<FriendRequestViewDto[]>([]);
+  const [outgoing, setOutgoing] = useState<FriendRequestViewDto[]>([]);
+
   const [loading, setLoading] = useState(true);
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const loadAll = async () => {
     try {
       setErr(null);
       setLoading(true);
+
       const [f, inc, out] = await Promise.all([
         friendsApi.list(),
         friendsApi.incoming(),
         friendsApi.outgoing(),
       ]);
+
       setFriends(f);
       setIncoming(inc);
       setOutgoing(out);
@@ -59,25 +74,24 @@ const Friends = () => {
 
   const pendingCount = incoming.length;
 
-  const accept = async (id: number) => {
-    await friendsApi.accept(id);
-    await loadAll();
+  const withAction = async (id: number, fn: () => Promise<any>) => {
+    try {
+      setErr(null);
+      setActionLoadingId(id);
+      await fn();
+      await loadAll();
+    } catch (e: any) {
+      setErr(e?.response?.data?.message ?? "Action failed.");
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
-  const reject = async (id: number) => {
-    await friendsApi.reject(id);
-    await loadAll();
-  };
-
-  const cancel = async (id: number) => {
-    await friendsApi.cancel(id);
-    await loadAll();
-  };
-
-  const removeFriend = async (friendId: number) => {
-    await friendsApi.remove(friendId);
-    await loadAll();
-  };
+  const accept = (id: number) => withAction(id, () => friendsApi.accept(id));
+  const reject = (id: number) => withAction(id, () => friendsApi.reject(id));
+  const cancel = (id: number) => withAction(id, () => friendsApi.cancel(id));
+  const removeFriend = (friendId: number) =>
+    withAction(friendId, () => friendsApi.remove(friendId));
 
   return (
     <div className="min-h-screen py-8">
@@ -98,7 +112,12 @@ const Friends = () => {
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-2 relative" onClick={() => {}}>
+            <Button
+              variant="outline"
+              className="gap-2 relative"
+              onClick={() => setTab("requests")}
+              disabled={loading}
+            >
               <Bell className="w-4 h-4" />
               Requests
               {pendingCount > 0 && (
@@ -108,14 +127,18 @@ const Friends = () => {
               )}
             </Button>
 
-            <Button className="gap-2" onClick={() => setAddFriendOpen(true)}>
+            <Button
+              className="gap-2"
+              onClick={() => setAddFriendOpen(true)}
+              disabled={loading}
+            >
               <UserPlus className="w-4 h-4" />
               Add Friend
             </Button>
           </div>
         </motion.div>
 
-        {/* Error / Loading */}
+        {/* Error */}
         {err && (
           <div className="mb-6 p-3 rounded-md border border-destructive/30 bg-destructive/10 text-destructive">
             {err}
@@ -131,21 +154,22 @@ const Friends = () => {
         >
           <div className="flex gap-2 max-w-md">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search friends by email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
+                disabled={loading}
               />
             </div>
-            <Button variant="outline" size="icon" onClick={() => {}}>
+            <Button variant="outline" size="icon" onClick={() => {}} disabled>
               <Filter className="w-4 h-4" />
             </Button>
           </div>
         </motion.div>
 
-        <Tabs defaultValue="friends" className="space-y-6">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)} className="space-y-6">
           <TabsList>
             <TabsTrigger value="friends" className="gap-2">
               <Users className="w-4 h-4" />
@@ -171,7 +195,7 @@ const Friends = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* FRIENDS TAB */}
+          {/* FRIENDS */}
           <TabsContent value="friends">
             {loading ? (
               <div className="text-muted-foreground">Loading...</div>
@@ -183,8 +207,8 @@ const Friends = () => {
                       key={f.id}
                       className="p-4 bg-card border border-border rounded-lg flex items-center justify-between gap-3"
                     >
-                      <div>
-                        <p className="font-medium text-foreground">{f.email}</p>
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground truncate">{f.email}</p>
                         <p className="text-sm text-muted-foreground">User #{f.id}</p>
                       </div>
 
@@ -192,8 +216,9 @@ const Friends = () => {
                         size="sm"
                         variant="outline"
                         onClick={() => removeFriend(f.id)}
+                        disabled={actionLoadingId === f.id}
                       >
-                        Remove
+                        {actionLoadingId === f.id ? "Removing..." : "Remove"}
                       </Button>
                     </div>
                   ))}
@@ -220,7 +245,7 @@ const Friends = () => {
             )}
           </TabsContent>
 
-          {/* REQUESTS TAB (incoming) */}
+          {/* INCOMING REQUESTS */}
           <TabsContent value="requests">
             {loading ? (
               <div className="text-muted-foreground">Loading...</div>
@@ -235,19 +260,29 @@ const Friends = () => {
                       transition={{ delay: index * 0.05 }}
                       className="flex items-center gap-4 p-4 bg-card border border-border rounded-lg"
                     >
-                      <div className="flex-1">
-                        <p className="font-medium text-foreground">
-                          From user #{r.senderId}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground truncate">
+                          {r.senderUsername || r.senderEmail}
                         </p>
-                        <p className="text-sm text-muted-foreground">
-                          Request ID: {r.id}
+                        <p className="text-sm text-muted-foreground truncate">
+                          {r.senderEmail}
                         </p>
                       </div>
+
                       <div className="flex gap-2">
-                        <Button size="sm" onClick={() => accept(r.id)}>
-                          Accept
+                        <Button
+                          size="sm"
+                          onClick={() => accept(r.id)}
+                          disabled={actionLoadingId === r.id}
+                        >
+                          {actionLoadingId === r.id ? "..." : "Accept"}
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => reject(r.id)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => reject(r.id)}
+                          disabled={actionLoadingId === r.id}
+                        >
                           Decline
                         </Button>
                       </div>
@@ -268,7 +303,7 @@ const Friends = () => {
             )}
           </TabsContent>
 
-          {/* OUTGOING TAB */}
+          {/* OUTGOING */}
           <TabsContent value="outgoing">
             {loading ? (
               <div className="text-muted-foreground">Loading...</div>
@@ -283,16 +318,22 @@ const Friends = () => {
                       transition={{ delay: index * 0.05 }}
                       className="flex items-center gap-4 p-4 bg-card border border-border rounded-lg"
                     >
-                      <div className="flex-1">
-                        <p className="font-medium text-foreground">
-                          To user #{r.receiverId}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground truncate">
+                          {r.receiverUsername || r.receiverEmail}
                         </p>
-                        <p className="text-sm text-muted-foreground">
-                          Request ID: {r.id}
+                        <p className="text-sm text-muted-foreground truncate">
+                          {r.receiverEmail}
                         </p>
                       </div>
-                      <Button size="sm" variant="outline" onClick={() => cancel(r.id)}>
-                        Cancel
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => cancel(r.id)}
+                        disabled={actionLoadingId === r.id}
+                      >
+                        {actionLoadingId === r.id ? "..." : "Cancel"}
                       </Button>
                     </motion.div>
                   ))
@@ -316,8 +357,7 @@ const Friends = () => {
       <AddFriendDialog
         open={addFriendOpen}
         onOpenChange={setAddFriendOpen}
-        // shumë e rëndësishme: pas suksesit, rifresko
-        onSuccess={loadAll as any}
+        onSuccess={loadAll}
       />
     </div>
   );
