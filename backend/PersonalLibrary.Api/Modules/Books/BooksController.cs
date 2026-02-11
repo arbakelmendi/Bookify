@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PersonalLibrary.Api.Data;
 using PersonalLibrary.Api.Models;
 using PersonalLibrary.Api.Modules.Books.Dtos;
+using PersonalLibrary.Api.Modules.Books.Mappers;
 using PersonalLibrary.Api.Services;
 
 namespace PersonalLibrary.Api.Modules.Books;
@@ -20,24 +21,28 @@ public class BooksController : ControllerBase
 
     // GET: /api/Books
     [HttpGet]
-    public async Task<ActionResult<List<Book>>> GetAll()
+    public async Task<ActionResult<List<BookDto>>> GetAll()
     {
-        var books = await _db.Books.AsNoTracking().ToListAsync();
-        return Ok(books);
+        var books = await _db.Books.ToListAsync();
+        var bookDtos = books.Select(b => b.ToDto()).ToList();
+        return Ok(bookDtos);
     }
 
     // GET: /api/Books/5
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<Book>> GetById(int id)
+    public async Task<ActionResult<BookDto>> GetById(int id)
     {
-        var book = await _db.Books.AsNoTracking().FirstOrDefaultAsync(b => b.Id == id);
-        if (book == null) return NotFound();
-        return Ok(book);
+        var book = await _db.Books.FindAsync(id);
+
+        if (book == null)
+            return NotFound($"Book with id {id} not found");
+
+        return Ok(book.ToDto());
     }
 
     // POST: /api/Books
     [HttpPost]
-    public async Task<ActionResult<Book>> Create([FromBody] CreateBookDto dto)
+    public async Task<ActionResult<BookDto>> Create([FromBody] CreateBookDto dto)
     {
         var book = new Book
         {
@@ -51,7 +56,8 @@ public class BooksController : ControllerBase
         _db.Books.Add(book);
         await _db.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetById), new { id = book.Id }, book);
+        // Kthen BookDto (jo entity)
+        return CreatedAtAction(nameof(GetById), new { id = book.Id }, book.ToDto());
     }
 
     // PUT: /api/Books/5
@@ -59,7 +65,7 @@ public class BooksController : ControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] UpdateBookDto updated)
     {
         var book = await _db.Books.FirstOrDefaultAsync(b => b.Id == id);
-        if (book == null) return NotFound();
+        if (book == null) return NotFound($"Book with id {id} not found");
 
         book.Title = updated.Title;
         book.Author = updated.Author;
@@ -76,21 +82,19 @@ public class BooksController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var book = await _db.Books.FirstOrDefaultAsync(b => b.Id == id);
-        if (book == null) return NotFound();
+        if (book == null) return NotFound($"Book with id {id} not found");
 
         _db.Books.Remove(book);
         await _db.SaveChangesAsync();
         return NoContent();
     }
 
-
-
-[HttpGet("external/isbn/{isbn}")]
-public async Task<IActionResult> GetExternalByIsbn(string isbn, [FromServices] GoogleBooksService svc)
-{
-    var result = await svc.GetByIsbnAsync(isbn);
-    if (result is null) return NotFound();
-    return Ok(result);
-}
-
+    // GET: /api/Books/external/isbn/xxxxxxxxxx
+    [HttpGet("external/isbn/{isbn}")]
+    public async Task<IActionResult> GetExternalByIsbn(string isbn, [FromServices] GoogleBooksService svc)
+    {
+        var result = await svc.GetByIsbnAsync(isbn);
+        if (result is null) return NotFound();
+        return Ok(result);
+    }
 }
