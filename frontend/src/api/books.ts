@@ -1,5 +1,6 @@
 import { apiGet } from "@/api/client";
 import type { Book, UserBook } from "@/types/book";
+import { getMyLibrary } from "@/api/userBooks";
 
 type ApiBook = {
   id: number;
@@ -8,6 +9,14 @@ type ApiBook = {
   description?: string | null;
   coverImageUrl?: string | null;
   year?: number | null;
+};
+
+type PagedResponse<T> = {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
 };
 
 const DEFAULT_COVER = "https://placehold.co/200x300/png?text=Book";
@@ -31,20 +40,19 @@ export function mapApiBookToBook(apiBook: ApiBook): Book {
   };
 }
 
-export function mapApiBookToUserBook(apiBook: ApiBook): UserBook {
-  const base = mapApiBookToBook(apiBook);
-  return {
-    ...base,
-    status: "to-read",
-    progress: 0,
-    userRating: 0,
-    dateAdded: new Date().toISOString(),
-  };
-}
-
-export async function getBooks(): Promise<Book[]> {
-  const data = await apiGet<ApiBook[]>("/api/Books");
-  return data.map(mapApiBookToBook);
+// ✅ Books katalogu (pagination/search/sort)
+export async function getBooks(params?: {
+  search?: string;
+  title?: string;
+  author?: string;
+  year?: number;
+  page?: number;
+  pageSize?: number;
+  sortBy?: "id" | "title" | "author" | "year";
+  sortDir?: "asc" | "desc";
+}): Promise<Book[]> {
+  const data = await apiGet<PagedResponse<ApiBook>>("/api/Books", params);
+  return (data.items ?? []).map(mapApiBookToBook);
 }
 
 export async function getBookById(id: string): Promise<Book> {
@@ -52,7 +60,7 @@ export async function getBookById(id: string): Promise<Book> {
   return mapApiBookToBook(data);
 }
 
+// ✅ IMPORTANT: Library e user-it duhet me lexu nga /api/UserBooks
 export async function getUserBooks(): Promise<UserBook[]> {
-  const data = await apiGet<ApiBook[]>("/api/Books");
-  return data.map(mapApiBookToUserBook);
+  return getMyLibrary();
 }

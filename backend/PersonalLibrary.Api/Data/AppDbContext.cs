@@ -26,6 +26,12 @@ public class AppDbContext : DbContext
             .HasIndex(br => new { br.UserId, br.BookId })
             .IsUnique();
 
+            
+        modelBuilder.Entity<UserBook>()
+            .HasIndex(ub => new { ub.UserId, ub.BookId })
+            .IsUnique();
+
+
         // Prevent duplicate pending friend requests (same sender -> receiver)
         modelBuilder.Entity<FriendRequest>()
             .HasIndex(fr => new { fr.SenderId, fr.ReceiverId })

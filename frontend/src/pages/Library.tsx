@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Filter } from "lucide-react";
+import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LibraryCard } from "@/components/library/LibraryCard";
 import { UserBook, ReadingStatus } from "@/types/book";
-import { getUserBooks } from "@/api/books";
+import { getMyLibrary, updateLibraryStatus } from "@/api/userBooks";
+
+
+
+
 
 const Library = () => {
   const [books, setBooks] = useState<UserBook[]>([]);
@@ -14,29 +18,25 @@ const Library = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ReadingStatus | "all">("all");
 
-  useEffect(() => {
-    let active = true;
-
-    const load = async () => {
-      try {
-        const data = await getUserBooks();
-        if (active) {
-          setBooks(data);
-        }
-      } catch (e) {
-        if (active) {
-          setError(e instanceof Error ? e.message : "Failed to load library.");
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
+  const load = async (activeRef?: { current: boolean }) => {
+    try {
+      setError(null);
+      const data = await getMyLibrary();
+      if (!activeRef || activeRef.current) setBooks(data);
+    } catch (e) {
+      if (!activeRef || activeRef.current) {
+        setError(e instanceof Error ? e.message : "Failed to load library.");
       }
-    };
+    } finally {
+      if (!activeRef || activeRef.current) setLoading(false);
+    }
+  };
 
-    load();
+  useEffect(() => {
+    const active = { current: true };
+    load(active);
     return () => {
-      active = false;
+      active.current = false;
     };
   }, []);
 
@@ -44,41 +44,58 @@ const Library = () => {
     { label: "All Books", value: "all" },
     { label: "Reading", value: "reading" },
     { label: "To Read", value: "to-read" },
-    { label: "Finished", value: "finished" }
+    { label: "Finished", value: "finished" },
   ];
 
-  const filteredBooks = books.filter(book => {
-    const matchesSearch = book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         book.author.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredBooks = books.filter((book) => {
+    const matchesSearch =
+      book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      book.author.toLowerCase().includes(searchQuery.toLowerCase());
+
     const matchesFilter = activeFilter === "all" || book.status === activeFilter;
     return matchesSearch && matchesFilter;
   });
 
-  const handleStatusChange = (id: string, status: ReadingStatus) => {
-    setBooks(prev => prev.map(book => 
-      book.id === id 
-        ? { ...book, status, progress: status === "finished" ? 100 : status === "to-read" ? 0 : book.progress }
-        : book
-    ));
+  // ✅ NOW PERSISTS IN DB
+  const handleStatusChange = async (id: string, status: ReadingStatus) => {
+    // optimistic update (UI ndryshon menjëherë)
+    setBooks((prev) =>
+      prev.map((book) =>
+        book.id === id
+          ? {
+              ...book,
+              status,
+              progress:
+                status === "finished" ? 100 : status === "to-read" ? 0 : book.progress,
+            }
+          : book
+      )
+    );
+
+    try {
+      // book.id është string (bookId) nga API mapping
+      const bookId = Number(id);
+      await updateLibraryStatus(bookId, status);
+
+      // optional refetch (e bën 100% të saktë)
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update status.");
+      // në rast dështimi, rifresko nga backend
+      await load();
+    }
   };
 
   const handleRatingChange = (id: string, rating: number) => {
-    setBooks(prev => prev.map(book => 
-      book.id === id ? { ...book, userRating: rating } : book
-    ));
+    // rating s’është i lidhur me backend ende (siç e ke)
+    setBooks((prev) => prev.map((book) => (book.id === id ? { ...book, userRating: rating } : book)));
   };
 
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <h1 className="text-3xl font-display font-bold text-foreground mb-2">
-            My Library
-          </h1>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+          <h1 className="text-3xl font-display font-bold text-foreground mb-2">My Library</h1>
           <p className="text-muted-foreground">
             {loading ? "Loading..." : `${books.length} books in your collection`}
           </p>
@@ -100,9 +117,9 @@ const Library = () => {
               className="pl-10"
             />
           </div>
-          
+
           <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
-            {filters.map(filter => (
+            {filters.map((filter) => (
               <Button
                 key={filter.value}
                 variant={activeFilter === filter.value ? "default" : "outline"}
@@ -131,11 +148,7 @@ const Library = () => {
         </div>
 
         {filteredBooks.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-12"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
             <p className="text-muted-foreground">No books found</p>
           </motion.div>
         )}

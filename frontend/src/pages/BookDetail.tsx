@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { 
-  Star, 
-  Headphones, 
-  Play, 
-  Plus, 
-  BookOpen, 
-  Clock, 
-  ArrowLeft, 
+import {
+  Star,
+  Headphones,
+  Play,
+  Plus,
+  BookOpen,
+  Clock,
+  ArrowLeft,
   Calendar,
   Tag,
   Heart,
@@ -20,15 +20,21 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { getBookById, getBooks } from "@/api/books";
 import { BookSection } from "@/components/books/BookSection";
-import type { Book } from "@/types/book";
+import type { Book, UserBook } from "@/types/book";
+import { addToLibrary } from "@/api/userBooks";
 
 const BookDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [book, setBook] = useState<Book | null>(null);
   const [allBooks, setAllBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // add-to-library state
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -36,6 +42,7 @@ const BookDetail = () => {
 
     const load = async () => {
       try {
+        setError(null);
         const [detail, list] = await Promise.all([getBookById(id), getBooks()]);
         if (active) {
           setBook(detail);
@@ -46,9 +53,7 @@ const BookDetail = () => {
           setError(e instanceof Error ? e.message : "Failed to load book.");
         }
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       }
     };
 
@@ -57,6 +62,32 @@ const BookDetail = () => {
       active = false;
     };
   }, [id]);
+
+  // ✅ Add to Library (persist in DB via POST /api/UserBooks)
+  const handleAddToLibrary = async () => {
+    if (!book) return;
+
+    setAdding(true);
+    setAddError(null);
+
+    try {
+      // book.id te types/book është string -> konverto në number
+      const bookId = Number(book.id);
+      if (Number.isNaN(bookId)) {
+        throw new Error("Invalid book id.");
+      }
+
+      // default status: "to-read"
+      await addToLibrary(bookId, "to-read" as UserBook["status"]);
+
+      // pas suksesit: shko te My Library (opsionale)
+      navigate("/library");
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : "Failed to add book to library.");
+    } finally {
+      setAdding(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -81,24 +112,19 @@ const BookDetail = () => {
     );
   }
 
-  // Get related books (same category, excluding current)
   const relatedBooks = allBooks
-    .filter(b => b.category === book.category && b.id !== book.id)
+    .filter((b) => b.category === book.category && b.id !== book.id)
     .slice(0, 6);
 
-  // Get more from author (mock - just get some books)
-  const moreFromAuthor = allBooks
-    .filter(b => b.id !== book.id)
-    .slice(0, 4);
+  const moreFromAuthor = allBooks.filter((b) => b.id !== book.id).slice(0, 4);
 
-  const coverSrc = book.coverImageUrl || book.cover || "https://placehold.co/600x900/png?text=Book";
+  const coverSrc =
+    book.coverImageUrl || book.cover || "https://placehold.co/600x900/png?text=Book";
 
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
       <section className="relative min-h-[60vh] flex items-center overflow-hidden">
-        {/* Background */}
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center"
           style={{ backgroundImage: `url(${coverSrc})` }}
         >
@@ -106,11 +132,10 @@ const BookDetail = () => {
           <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/30" />
         </div>
 
-        {/* Back Button */}
         <div className="absolute top-4 left-4 z-20">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => navigate(-1)}
             className="gap-2 bg-background/50 backdrop-blur-sm hover:bg-background/70"
           >
@@ -119,10 +144,8 @@ const BookDetail = () => {
           </Button>
         </div>
 
-        {/* Content */}
         <div className="container mx-auto px-4 relative z-10 pt-16">
           <div className="grid md:grid-cols-[300px_1fr] gap-12 items-start">
-            {/* Book Cover */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -136,7 +159,8 @@ const BookDetail = () => {
                   alt={book.title}
                   className="relative w-64 h-80 md:w-72 md:h-96 object-cover rounded-xl shadow-2xl"
                   onError={(e) => {
-                    e.currentTarget.src = "https://placehold.co/600x900/png?text=Book";
+                    e.currentTarget.src =
+                      "https://placehold.co/600x900/png?text=Book";
                   }}
                 />
                 {book.isAudiobook && (
@@ -147,7 +171,6 @@ const BookDetail = () => {
               </div>
             </motion.div>
 
-            {/* Book Info */}
             <motion.div
               initial={{ opacity: 0, x: 30 }}
               animate={{ opacity: 1, x: 0 }}
@@ -159,7 +182,7 @@ const BookDetail = () => {
                   <Tag className="w-3 h-3" />
                   {book.category}
                 </Badge>
-                
+
                 <h1 className="text-3xl md:text-4xl lg:text-5xl font-display font-bold text-foreground leading-tight">
                   {book.title}
                 </h1>
@@ -169,14 +192,17 @@ const BookDetail = () => {
                 </p>
               </div>
 
-              {/* Rating & Stats */}
               <div className="flex flex-wrap items-center gap-6 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1">
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <Star 
-                        key={star} 
-                        className={`w-5 h-5 ${star <= Math.round(book.rating) ? 'text-primary fill-current' : 'text-muted-foreground'}`} 
+                      <Star
+                        key={star}
+                        className={`w-5 h-5 ${
+                          star <= Math.round(book.rating)
+                            ? "text-primary fill-current"
+                            : "text-muted-foreground"
+                        }`}
                       />
                     ))}
                   </div>
@@ -202,7 +228,6 @@ const BookDetail = () => {
                 </div>
               </div>
 
-              {/* Description */}
               <div className="space-y-2">
                 <h3 className="font-semibold text-foreground">About this book</h3>
                 <p className="text-muted-foreground leading-relaxed max-w-2xl">
@@ -210,12 +235,18 @@ const BookDetail = () => {
                 </p>
               </div>
 
-              {/* Action Buttons */}
+              {/* ✅ Action Buttons */}
               <div className="flex flex-wrap gap-3 pt-2">
-                <Button size="lg" className="gap-2">
+                <Button
+                  size="lg"
+                  className="gap-2"
+                  onClick={handleAddToLibrary}
+                  disabled={adding}
+                >
                   <Plus className="w-5 h-5" />
-                  Add to Library
+                  {adding ? "Adding..." : "Add to Library"}
                 </Button>
+
                 <Button
                   size="lg"
                   variant="outline"
@@ -225,13 +256,15 @@ const BookDetail = () => {
                   <Play className="w-5 h-5" />
                   Listen Now
                 </Button>
+
                 <Button size="lg" variant="outline" className="gap-2">
                   <Bookmark className="w-5 h-5" />
                   Save
                 </Button>
               </div>
 
-              {/* Quick Actions */}
+              {addError && <p className="text-destructive text-sm">{addError}</p>}
+
               <div className="flex items-center gap-4 pt-2">
                 <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
                   <Heart className="w-4 h-4" />
@@ -247,10 +280,8 @@ const BookDetail = () => {
         </div>
       </section>
 
-      {/* Additional Info Section */}
       <section className="container mx-auto px-4 py-12">
         <div className="grid md:grid-cols-3 gap-8">
-          {/* Book Details */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -281,7 +312,6 @@ const BookDetail = () => {
             </div>
           </motion.div>
 
-          {/* Reading Stats */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -313,7 +343,6 @@ const BookDetail = () => {
             </div>
           </motion.div>
 
-          {/* Genres & Tags */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -334,68 +363,12 @@ const BookDetail = () => {
         </div>
       </section>
 
-      {/* Reviews Section */}
-      <section className="container mx-auto px-4 py-12">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="space-y-6"
-        >
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-xl text-foreground">Reader Reviews</h3>
-            <Button variant="outline" size="sm">Write a Review</Button>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {[
-              { name: "Sarah M.", rating: 5, date: "2 days ago", text: "Absolutely captivating! I couldn't put it down. The author has a way with words that pulls you into the story immediately." },
-              { name: "John D.", rating: 4, date: "1 week ago", text: "Great read overall. The pacing was perfect and the characters were well-developed. Highly recommend for fans of the genre." },
-              { name: "Emily R.", rating: 5, date: "2 weeks ago", text: "This book changed my perspective on so many things. Beautifully written and thought-provoking. A must-read!" },
-              { name: "Michael T.", rating: 4, date: "3 weeks ago", text: "Engaging from start to finish. The plot twists were unexpected and kept me guessing until the very end." }
-            ].map((review, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="p-4 rounded-lg bg-card border border-border space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-primary font-semibold">{review.name[0]}</span>
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">{review.name}</p>
-                      <p className="text-xs text-muted-foreground">{review.date}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star 
-                        key={star} 
-                        className={`w-4 h-4 ${star <= review.rating ? 'text-primary fill-current' : 'text-muted-foreground'}`} 
-                      />
-                    ))}
-                  </div>
-                </div>
-                <p className="text-muted-foreground text-sm">{review.text}</p>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      </section>
-
-      {/* Related Books */}
       {relatedBooks.length > 0 && (
         <section className="container mx-auto px-4 py-12">
           <BookSection title={`More in ${book.category}`} books={relatedBooks} />
         </section>
       )}
 
-      {/* More from Author */}
       <section className="container mx-auto px-4 py-12">
         <BookSection title="You Might Also Like" books={moreFromAuthor} />
       </section>

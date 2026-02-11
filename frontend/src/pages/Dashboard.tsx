@@ -1,10 +1,27 @@
 import { motion } from "framer-motion";
-import { BookOpen, BookMarked, CheckCircle, Clock, TrendingUp } from "lucide-react";
+import {
+  BookOpen,
+  BookMarked,
+  CheckCircle,
+  Clock,
+  TrendingUp,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { apiGet } from "@/api/client";
 import { mockUserBooks } from "@/data/mockData";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 import { useEffect, useMemo, useState } from "react";
 
 type ApiBook = {
@@ -12,6 +29,15 @@ type ApiBook = {
   title: string;
   author: string | null;
   year: number | null;
+};
+
+// ✅ Paged response from backend: { items, page, pageSize, totalCount, totalPages }
+type PagedResponse<T> = {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
 };
 
 // Ky tip është vetëm për UI-në që e ke tash (mockUserBooks)
@@ -29,16 +55,23 @@ const Dashboard = () => {
   const [apiBooks, setApiBooks] = useState<ApiBook[] | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  // ✅ Merr librat nga backend (GET /api/books)
+  // ✅ Merr librat nga backend (GET /api/Books) - tash kthen PagedResponse
   useEffect(() => {
     let ignore = false;
 
     (async () => {
       try {
         setApiError(null);
-        const data = await apiGet<ApiBook[]>("/api/books");
+
+        const data = await apiGet<PagedResponse<ApiBook>>("/api/Books", {
+          page: 1,
+          pageSize: 50,
+          sortBy: "title",
+          sortDir: "asc",
+        });
+
         if (!ignore) {
-          setApiBooks(data);
+          setApiBooks(data.items ?? []);
         }
       } catch (err: any) {
         if (!ignore) {
@@ -84,20 +117,52 @@ const Dashboard = () => {
     { name: "Thu", books: 4 },
     { name: "Fri", books: 2 },
     { name: "Sat", books: 5 },
-    { name: "Sun", books: 3 }
+    { name: "Sun", books: 3 },
   ];
 
   const pieData = [
-    { name: "Reading", value: readingBooks.length, color: "hsl(var(--status-reading))" },
-    { name: "Finished", value: finishedBooks.length, color: "hsl(var(--status-finished))" },
-    { name: "To Read", value: toReadBooks.length, color: "hsl(var(--status-toread))" }
+    {
+      name: "Reading",
+      value: readingBooks.length,
+      color: "hsl(var(--status-reading))",
+    },
+    {
+      name: "Finished",
+      value: finishedBooks.length,
+      color: "hsl(var(--status-finished))",
+    },
+    {
+      name: "To Read",
+      value: toReadBooks.length,
+      color: "hsl(var(--status-toread))",
+    },
   ];
 
   const stats = [
-    { label: "Total Books", value: totalBooks, icon: BookOpen, color: "text-primary" },
-    { label: "Currently Reading", value: readingBooks.length, icon: BookMarked, color: "text-status-reading" },
-    { label: "Finished", value: finishedBooks.length, icon: CheckCircle, color: "text-status-finished" },
-    { label: "To Read", value: toReadBooks.length, icon: Clock, color: "text-status-toread" }
+    {
+      label: "Total Books",
+      value: totalBooks,
+      icon: BookOpen,
+      color: "text-primary",
+    },
+    {
+      label: "Currently Reading",
+      value: readingBooks.length,
+      icon: BookMarked,
+      color: "text-status-reading",
+    },
+    {
+      label: "Finished",
+      value: finishedBooks.length,
+      icon: CheckCircle,
+      color: "text-status-finished",
+    },
+    {
+      label: "To Read",
+      value: toReadBooks.length,
+      icon: Clock,
+      color: "text-status-toread",
+    },
   ];
 
   const isFetchError = apiError?.toLowerCase().includes("failed to fetch");
@@ -122,11 +187,17 @@ const Dashboard = () => {
             {apiError && !isFetchError ? (
               <span className="text-destructive">API error: {apiError}</span>
             ) : apiBooks ? (
-              <span className="text-muted-foreground">Loaded {apiBooks.length} books from API.</span>
+              <span className="text-muted-foreground">
+                Loaded {apiBooks.length} books from API.
+              </span>
             ) : apiError && isFetchError ? (
-              <span className="text-muted-foreground">API unavailable. Using mock data.</span>
+              <span className="text-muted-foreground">
+                API unavailable. Using mock data.
+              </span>
             ) : (
-              <span className="text-muted-foreground">Loading books from API...</span>
+              <span className="text-muted-foreground">
+                Loading books from API...
+              </span>
             )}
           </div>
         </motion.div>
@@ -144,8 +215,12 @@ const Dashboard = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">{stat.label}</p>
-                      <p className="text-3xl font-bold text-foreground mt-1">{stat.value}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {stat.label}
+                      </p>
+                      <p className="text-3xl font-bold text-foreground mt-1">
+                        {stat.value}
+                      </p>
                     </div>
                     <stat.icon className={`w-8 h-8 ${stat.color}`} />
                   </div>
@@ -173,19 +248,39 @@ const Dashboard = () => {
                 <ResponsiveContainer width="100%" height={250}>
                   <AreaChart data={activityData}>
                     <defs>
-                      <linearGradient id="colorBooks" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      <linearGradient
+                        id="colorBooks"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="hsl(var(--primary))"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="hsl(var(--primary))"
+                          stopOpacity={0}
+                        />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="hsl(var(--border))"
+                    />
+                    <XAxis
+                      dataKey="name"
+                      stroke="hsl(var(--muted-foreground))"
+                    />
                     <YAxis stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px"
+                        borderRadius: "8px",
                       }}
                     />
                     <Area
@@ -230,11 +325,12 @@ const Dashboard = () => {
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px"
+                        borderRadius: "8px",
                       }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
+
                 <div className="flex justify-center gap-6 mt-4">
                   {pieData.map((item) => (
                     <div key={item.name} className="flex items-center gap-2">
@@ -242,7 +338,9 @@ const Dashboard = () => {
                         className="w-3 h-3 rounded-full"
                         style={{ backgroundColor: item.color }}
                       />
-                      <span className="text-sm text-muted-foreground">{item.name}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {item.name}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -264,21 +362,35 @@ const Dashboard = () => {
             <CardContent>
               <div className="space-y-4">
                 {readingBooks.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No books currently marked as reading.</p>
+                  <p className="text-sm text-muted-foreground">
+                    No books currently marked as reading.
+                  </p>
                 ) : (
                   readingBooks.map((book) => (
                     <div key={book.id} className="flex items-center gap-4">
                       <img
-                        src={book.cover ?? "https://placehold.co/200x300/png?text=Book"}
+                        src={
+                          book.cover ??
+                          "https://placehold.co/200x300/png?text=Book"
+                        }
                         alt={book.title}
                         className="w-12 h-16 object-cover rounded"
                       />
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-foreground line-clamp-1">{book.title}</h4>
-                        <p className="text-sm text-muted-foreground">{book.author}</p>
+                        <h4 className="font-medium text-foreground line-clamp-1">
+                          {book.title}
+                        </h4>
+                        <p className="text-sm text-muted-foreground">
+                          {book.author}
+                        </p>
                         <div className="flex items-center gap-2 mt-1">
-                          <Progress value={book.progress ?? 0} className="h-1.5 flex-1" />
-                          <span className="text-xs text-muted-foreground">{book.progress ?? 0}%</span>
+                          <Progress
+                            value={book.progress ?? 0}
+                            className="h-1.5 flex-1"
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            {book.progress ?? 0}%
+                          </span>
                         </div>
                       </div>
                     </div>
