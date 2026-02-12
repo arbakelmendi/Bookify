@@ -6,12 +6,22 @@ import { Button } from "@/components/ui/button";
 import { LibraryCard } from "@/components/library/LibraryCard";
 import { UserBook, ReadingStatus } from "@/types/book";
 import { getMyLibrary, updateLibraryStatus } from "@/api/userBooks";
+import { useSearchParams } from "react-router-dom";
 
 
+function normalizeStatus(s?: string) {
+  const v = (s ?? "").trim();
 
+  // ToRead / Finished / Reading -> to-read / finished / reading
+  const camelToKebab = v.replace(/([a-z0-9])([A-Z])/g, "$1-$2");
+
+  return camelToKebab.toLowerCase().replace(/\s|_/g, "-");
+}
 
 
 const Library = () => {
+  const [searchParams, setSearchParams] = useSearchParams(); // ✅ DUHET BRENDA
+
   const [books, setBooks] = useState<UserBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +42,7 @@ const Library = () => {
     }
   };
 
+  // ✅ load data
   useEffect(() => {
     const active = { current: true };
     load(active);
@@ -39,6 +50,14 @@ const Library = () => {
       active.current = false;
     };
   }, []);
+
+  // ✅ read filter from URL (?filter=to-read)
+  useEffect(() => {
+    const f = normalizeStatus(searchParams.get("filter") ?? "");
+    if (f === "reading" || f === "to-read" || f === "finished" || f === "all") {
+      setActiveFilter(f as any);
+    }
+  }, [searchParams]);
 
   const filters: { label: string; value: ReadingStatus | "all" }[] = [
     { label: "All Books", value: "all" },
@@ -52,42 +71,37 @@ const Library = () => {
       book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       book.author.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesFilter = activeFilter === "all" || book.status === activeFilter;
+    const matchesFilter =
+      activeFilter === "all" ||
+      normalizeStatus(book.status) === normalizeStatus(activeFilter);
+
     return matchesSearch && matchesFilter;
   });
 
-  // ✅ NOW PERSISTS IN DB
   const handleStatusChange = async (id: string, status: ReadingStatus) => {
-    // optimistic update (UI ndryshon menjëherë)
     setBooks((prev) =>
       prev.map((book) =>
         book.id === id
           ? {
               ...book,
               status,
-              progress:
-                status === "finished" ? 100 : status === "to-read" ? 0 : book.progress,
+              progress: status === "finished" ? 100 : status === "to-read" ? 0 : book.progress,
             }
           : book
       )
     );
 
     try {
-      // book.id është string (bookId) nga API mapping
       const bookId = Number(id);
       await updateLibraryStatus(bookId, status);
-
-      // optional refetch (e bën 100% të saktë)
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update status.");
-      // në rast dështimi, rifresko nga backend
       await load();
     }
   };
 
   const handleRatingChange = (id: string, rating: number) => {
-    // rating s’është i lidhur me backend ende (siç e ke)
     setBooks((prev) => prev.map((book) => (book.id === id ? { ...book, userRating: rating } : book)));
   };
 
@@ -124,7 +138,12 @@ const Library = () => {
                 key={filter.value}
                 variant={activeFilter === filter.value ? "default" : "outline"}
                 size="sm"
-                onClick={() => setActiveFilter(filter.value)}
+                onClick={() => {
+                  setActiveFilter(filter.value);
+
+                  if (filter.value === "all") setSearchParams({});
+                  else setSearchParams({ filter: filter.value });
+                }}
                 className="flex-shrink-0"
               >
                 {filter.label}

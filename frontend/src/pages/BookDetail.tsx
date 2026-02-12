@@ -1,3 +1,4 @@
+import { ReadingTracker } from "@/components/reading/ReadingTracker";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -21,7 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { getBookById, getBooks } from "@/api/books";
 import { BookSection } from "@/components/books/BookSection";
 import type { Book, UserBook } from "@/types/book";
-import { addToLibrary } from "@/api/userBooks";
+import { addToLibrary, updateLibraryStatus } from "@/api/userBooks";
 
 const BookDetail = () => {
   const { id } = useParams();
@@ -88,6 +89,35 @@ const BookDetail = () => {
       setAdding(false);
     }
   };
+
+const handleSaveToRead = async () => {
+  if (!book) return;
+
+  setAdding(true);
+  setAddError(null);
+
+  try {
+    const bookId = Number(book.id);
+    if (Number.isNaN(bookId)) throw new Error("Invalid book id.");
+
+    try {
+      // provon me e shtu
+      await addToLibrary(bookId, "to-read" as UserBook["status"]);
+    } catch (e: any) {
+      // nese ekziston, veç ia ndrron statusin
+      await updateLibraryStatus(bookId, "to-read");
+    }
+
+    // shko te To Read direkt
+    navigate("/library?filter=to-read");
+  } catch (e) {
+    setAddError(e instanceof Error ? e.message : "Failed to save book.");
+  } finally {
+    setAdding(false);
+  }
+};
+
+
 
   if (loading) {
     return (
@@ -257,11 +287,24 @@ const BookDetail = () => {
                   Listen Now
                 </Button>
 
-                <Button size="lg" variant="outline" className="gap-2">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleSaveToRead}
+                  disabled={adding}
+                >
                   <Bookmark className="w-5 h-5" />
-                  Save
+                  {adding ? "Saving..." : "Save"}
                 </Button>
+
               </div>
+
+              {/* 📖 Reading Tracker */}
+              <div className="pt-6">
+                <ReadingTracker bookId={Number(book.id)} />
+              </div>
+
 
               {addError && <p className="text-destructive text-sm">{addError}</p>}
 

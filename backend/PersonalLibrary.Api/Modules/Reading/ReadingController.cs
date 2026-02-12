@@ -1,10 +1,11 @@
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PersonalLibrary.Api.Modules.Reading.Dtos;
+using Microsoft.AspNetCore.Authorization;
 
 namespace PersonalLibrary.Api.Modules.Reading;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class ReadingController : ControllerBase
@@ -16,14 +17,18 @@ public class ReadingController : ControllerBase
         _service = service;
     }
 
-    [HttpGet]
-    public async Task<IActionResult> GetAll()
+    /* ================= GET ================= */
+
+    // GET /api/Reading/my
+    [HttpGet("my")]
+    public async Task<IActionResult> My()
     {
         var userId = GetUserId();
         var data = await _service.GetAllAsync(userId);
         return Ok(data);
     }
 
+    // GET /api/Reading/{id}
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -33,23 +38,62 @@ public class ReadingController : ControllerBase
         return Ok(data);
     }
 
-    [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateReadingDto dto)
+    // GET /api/Reading/current
+    [HttpGet("current")]
+    public async Task<IActionResult> Current()
     {
         var userId = GetUserId();
-        var created = await _service.CreateAsync(userId, dto);
+        var data = await _service.GetCurrentAsync(userId);
+        return Ok(data);
+    }
+
+    // GET /api/Reading/finished
+    [HttpGet("finished")]
+    public async Task<IActionResult> Finished()
+    {
+        var userId = GetUserId();
+        var data = await _service.GetFinishedAsync(userId);
+        return Ok(data);
+    }
+
+    /* ================= START ================= */
+
+    // POST /api/Reading/start
+    [HttpPost("start")]
+    public async Task<IActionResult> Start([FromBody] StartReadingDto dto)
+    {
+        var userId = GetUserId();
+        var created = await _service.StartAsync(userId, dto);
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
-    [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, [FromBody] UpdateReadingDto dto)
+    /* ================= UPDATE PROGRESS ================= */
+
+    // PUT /api/Reading/{id}/progress
+    [HttpPut("{id:int}/progress")]
+    public async Task<IActionResult> UpdateProgress(int id, [FromBody] UpdateProgressDto dto)
     {
         var userId = GetUserId();
-        var ok = await _service.UpdateAsync(id, userId, dto);
+        var ok = await _service.UpdateProgressAsync(id, userId, dto);
         if (!ok) return NotFound();
         return NoContent();
     }
 
+    /* ================= MARK FINISHED ================= */
+
+    // PUT /api/Reading/{id}/finish
+    [HttpPut("{id:int}/finish")]
+    public async Task<IActionResult> Finish(int id)
+    {
+        var userId = GetUserId();
+        var ok = await _service.MarkFinishedAsync(id, userId);
+        if (!ok) return NotFound();
+        return NoContent();
+    }
+
+    /* ================= DELETE ================= */
+
+    // DELETE /api/Reading/{id}
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
@@ -59,12 +103,23 @@ public class ReadingController : ControllerBase
         return NoContent();
     }
 
-    private int GetUserId()
+    /* ================= HELPER ================= */
+
+        private int GetUserId()
     {
         var idStr =
             User.FindFirstValue(ClaimTypes.NameIdentifier) ??
-            User.FindFirstValue("sub");
+            User.FindFirstValue("sub") ??
+            User.FindFirstValue("userId") ??
+            User.FindFirstValue("id");
 
-        return int.Parse(idStr!);
+        if (string.IsNullOrWhiteSpace(idStr))
+            throw new UnauthorizedAccessException("Missing user id claim.");
+
+        if (!int.TryParse(idStr, out var userId))
+            throw new UnauthorizedAccessException($"Invalid user id claim: {idStr}");
+
+        return userId;
     }
+
 }
