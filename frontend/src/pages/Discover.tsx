@@ -17,17 +17,11 @@ const Discover = () => {
     const load = async () => {
       try {
         const data = await getBooks();
-        if (active) {
-          setBooks(data);
-        }
+        if (active) setBooks(data);
       } catch (e) {
-        if (active) {
-          setError(e instanceof Error ? e.message : "Failed to load books.");
-        }
+        if (active) setError(e instanceof Error ? e.message : "Failed to load books.");
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       }
     };
 
@@ -38,6 +32,7 @@ const Discover = () => {
   }, []);
 
   const query = (searchParams.get("q") ?? "").trim().toLowerCase();
+
   const visibleBooks = useMemo(() => {
     if (!query) return books;
     return books.filter((book) => {
@@ -47,9 +42,9 @@ const Discover = () => {
     });
   }, [books, query]);
 
-  const trending = visibleBooks.filter(book => book.rating >= 4.5);
-  const newReleases = visibleBooks.filter(book => book.publishedYear >= 2023);
-  const audiobooks = visibleBooks.filter(book => book.isAudiobook);
+  const trending = visibleBooks.filter((b) => b.rating >= 4.5);
+  const newReleases = visibleBooks.filter((b) => b.publishedYear >= 2023);
+  const audiobooks = visibleBooks.filter((b) => b.isAudiobook);
   const recommended = visibleBooks.slice(0, 6);
 
   return (
@@ -59,14 +54,20 @@ const Discover = () => {
       <div className="container mx-auto px-4 py-8 space-y-12">
         {loading && <p className="text-muted-foreground">Loading books...</p>}
         {error && <p className="text-destructive">{error}</p>}
+
         {!loading && !error && (
           <>
             {query && visibleBooks.length === 0 && (
               <p className="text-muted-foreground">No books found for "{query}".</p>
             )}
-            <BookSection title="Trending Now" books={trending.length ? trending : visibleBooks} />
-            <BookSection title="New Releases" books={newReleases.length ? newReleases : visibleBooks} />
-            <BookSection title="Audiobooks" books={audiobooks.length ? audiobooks : visibleBooks} />
+
+            {/* show trending only if it exists, otherwise skip it */}
+            {trending.length > 0 && <BookSection title="Trending Now" books={trending} />}
+
+            {newReleases.length > 0 && <BookSection title="New Releases" books={newReleases} />}
+
+            {audiobooks.length > 0 && <BookSection title="Audiobooks" books={audiobooks} />}
+
             <BookSection title="Recommended for You" books={recommended.length ? recommended : visibleBooks} />
           </>
         )}

@@ -1,7 +1,7 @@
 import { apiGet, apiPost, apiPut, apiDelete } from "@/api/client";
 import type { Book, UserBook } from "@/types/book";
 
-type ApiUserBook = {
+type ApiUserBookFlat = {
   id: number;
   userId: number;
   bookId: number;
@@ -12,6 +12,18 @@ type ApiUserBook = {
   description?: string | null;
   coverImageUrl?: string | null;
   year?: number | null;
+};
+
+// sometimes backend returns nested Book object; tolerate both
+type ApiUserBookMaybeNested = ApiUserBookFlat & {
+  book?: {
+    id?: number;
+    title?: string;
+    author?: string | null;
+    description?: string | null;
+    coverImageUrl?: string | null;
+    year?: number | null;
+  };
 };
 
 const DEFAULT_COVER = "https://placehold.co/200x300/png?text=Book";
@@ -31,20 +43,28 @@ function uiStatusToApi(status: UserBook["status"]): string {
   return "Reading";
 }
 
-export function mapApiUserBookToUserBook(x: ApiUserBook): UserBook {
-  const cover = x.coverImageUrl ?? "";
+export function mapApiUserBookToUserBook(x: ApiUserBookMaybeNested): UserBook {
+  const b = x.book ?? ({} as any);
+
+  const title = x.title ?? b.title ?? "Untitled";
+  const author = x.author ?? b.author ?? "Unknown author";
+  const description = x.description ?? b.description ?? "No description available yet.";
+  const year = x.year ?? b.year ?? undefined;
+  const coverUrl = x.coverImageUrl ?? b.coverImageUrl ?? "";
+
   const base: Book = {
-    id: String(x.bookId),
-    title: x.title,
-    author: x.author ?? "Unknown author",
-    cover: cover || DEFAULT_COVER,
-    coverImageUrl: cover || undefined,
+    id: String(x.bookId ?? b.id ?? 0),
+    title,
+    author,
+    cover: coverUrl || DEFAULT_COVER,
+    coverImageUrl: coverUrl || undefined,
+
     rating: 0,
     category: "General",
-    description: x.description ?? "No description available yet.",
+    description,
     pages: 0,
-    publishedYear: x.year ?? 0,
-    year: x.year ?? undefined,
+    publishedYear: year ?? 0,
+    year,
     duration: undefined,
     isAudiobook: false,
   };
@@ -60,7 +80,7 @@ export function mapApiUserBookToUserBook(x: ApiUserBook): UserBook {
 
 // ✅ list my library (persisted)
 export async function getMyLibrary(): Promise<UserBook[]> {
-  const data = await apiGet<ApiUserBook[]>("/api/UserBooks");
+  const data = await apiGet<ApiUserBookMaybeNested[]>("/api/UserBooks");
   return (data ?? []).map(mapApiUserBookToUserBook);
 }
 

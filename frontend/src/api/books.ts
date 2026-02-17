@@ -9,6 +9,9 @@ type ApiBook = {
   description?: string | null;
   coverImageUrl?: string | null;
   year?: number | null;
+
+  // optional if backend ever adds it
+  pdfUrl?: string | null;
 };
 
 type PagedResponse<T> = {
@@ -23,24 +26,32 @@ const DEFAULT_COVER = "https://placehold.co/200x300/png?text=Book";
 
 export function mapApiBookToBook(apiBook: ApiBook): Book {
   const coverImageUrl = apiBook.coverImageUrl ?? "";
+  const year = apiBook.year ?? undefined;
+
+  // ✅ PDF fallback from public folder if backend doesn't provide it
+  const fallbackPdf = `/pdfs/${apiBook.id}.pdf`;
+
   return {
     id: String(apiBook.id),
-    title: apiBook.title,
+    title: apiBook.title ?? "Untitled",
     author: apiBook.author ?? "Unknown author",
     cover: coverImageUrl || DEFAULT_COVER,
     coverImageUrl: coverImageUrl || undefined,
+
     rating: 0,
     category: "General",
     description: apiBook.description ?? "No description available yet.",
     pages: 0,
-    publishedYear: apiBook.year ?? 0,
-    year: apiBook.year ?? undefined,
+    publishedYear: year ?? 0,
+    year,
     duration: undefined,
     isAudiobook: false,
+
+    pdfUrl: apiBook.pdfUrl ?? fallbackPdf,
   };
 }
 
-// ✅ Books katalogu (pagination/search/sort)
+// ✅ IMPORTANT: fetch more than 10 (backend is paged)
 export async function getBooks(params?: {
   search?: string;
   title?: string;
@@ -51,8 +62,13 @@ export async function getBooks(params?: {
   sortBy?: "id" | "title" | "author" | "year";
   sortDir?: "asc" | "desc";
 }): Promise<Book[]> {
-  const data = await apiGet<PagedResponse<ApiBook>>("/api/Books", params);
-  return (data.items ?? []).map(mapApiBookToBook);
+  const data = await apiGet<PagedResponse<ApiBook>>("/api/Books", {
+    page: 1,
+    pageSize: 50,
+    ...params,
+  });
+
+  return (data?.items ?? []).map(mapApiBookToBook);
 }
 
 export async function getBookById(id: string): Promise<Book> {
@@ -60,7 +76,7 @@ export async function getBookById(id: string): Promise<Book> {
   return mapApiBookToBook(data);
 }
 
-// ✅ IMPORTANT: Library e user-it duhet me lexu nga /api/UserBooks
+// ✅ library
 export async function getUserBooks(): Promise<UserBook[]> {
   return getMyLibrary();
 }

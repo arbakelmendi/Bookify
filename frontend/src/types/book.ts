@@ -6,6 +6,7 @@ export interface Book {
   author: string;
   cover: string;
   coverImageUrl?: string;
+
   rating: number;
   category: string;
   description: string;
@@ -13,7 +14,10 @@ export interface Book {
   publishedYear: number;
   year?: number;
   duration?: string;
-  isAudiobook?: boolean;
+  isAudiobook: boolean;
+
+  // ✅ NEW: where to read as PDF
+  pdfUrl?: string;
 }
 
 export interface UserBook extends Book {

@@ -25,6 +25,9 @@ import BookAudio from "@/pages/BookAudio";
 import FriendProfile from "@/pages/FriendProfile";
 import NotFound from "@/pages/NotFound";
 import ImportBook from "@/pages/ImportBook";
+import BookReader from "@/pages/BookReader";
+
+
 
 import { api } from "@/lib/api";
 
@@ -49,9 +52,13 @@ const App = () => {
               <Navbar />
               <main className="flex-1">
                 <Routes>
+                  {/* Public */}
                   <Route path="/" element={<Discover />} />
                   <Route path="/import" element={<ImportBook />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/signup" element={<Signup />} />
 
+                  {/* Protected */}
                   <Route
                     path="/library"
                     element={
@@ -76,19 +83,6 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   />
-
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/signup" element={<Signup />} />
-
-                  <Route
-                    path="/admin"
-                    element={
-                      <AdminRoute>
-                        <Admin />
-                      </AdminRoute>
-                    }
-                  />
-
                   <Route
                     path="/books/:id"
                     element={
@@ -97,7 +91,14 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   />
-                 
+                  <Route
+                    path="/books/:id/read"
+                    element={
+                      <ProtectedRoute>
+                        <BookReader />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route
                     path="/books/:id/audio"
                     element={
@@ -115,6 +116,17 @@ const App = () => {
                     }
                   />
 
+                  {/* Admin */}
+                  <Route
+                    path="/admin"
+                    element={
+                      <AdminRoute>
+                        <Admin />
+                      </AdminRoute>
+                    }
+                  />
+
+                  {/* 404 */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>
