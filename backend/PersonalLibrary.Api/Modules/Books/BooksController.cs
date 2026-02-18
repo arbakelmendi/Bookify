@@ -105,42 +105,48 @@ public class BooksController : ControllerBase
         return Ok(book.ToDto());
     }
 
-    // POST: /api/Books
-    [HttpPost]
-    public async Task<ActionResult<BookDto>> Create([FromBody] CreateBookDto dto)
+// POST: /api/Books
+[HttpPost]
+public async Task<ActionResult<BookDto>> Create([FromBody] CreateBookDto dto)
+{
+    var book = new Book
     {
-        var book = new Book
-        {
-            Title = dto.Title,
-            Author = dto.Author,
-            Description = dto.Description,
-            CoverImageUrl = dto.CoverImageUrl,
-            Year = dto.Year
-        };
+        Title = dto.Title,
+        Author = dto.Author,
+        Description = dto.Description,
+        CoverImageUrl = dto.CoverImageUrl,
+        Year = dto.Year,
 
-        _db.Books.Add(book);
-        await _db.SaveChangesAsync();
+        PdfUrl = dto.PdfUrl,
+        PreviewUrl = dto.PreviewUrl
+    };
 
-        return CreatedAtAction(nameof(GetById), new { id = book.Id }, book.ToDto());
-    }
+    _db.Books.Add(book);
+    await _db.SaveChangesAsync();
 
-    // PUT: /api/Books/5
-    [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, [FromBody] UpdateBookDto dto)
-    {
-        var book = await _db.Books.FirstOrDefaultAsync(b => b.Id == id);
-        if (book == null)
-            return NotFound($"Book with id {id} not found");
+    return CreatedAtAction(nameof(GetById), new { id = book.Id }, book.ToDto());
+}
 
-        book.Title = dto.Title;
-        book.Author = dto.Author;
-        book.Description = dto.Description;
-        book.CoverImageUrl = dto.CoverImageUrl;
-        book.Year = dto.Year;
+// PUT: /api/Books/5
+[HttpPut("{id:int}")]
+public async Task<IActionResult> Update(int id, [FromBody] UpdateBookDto dto)
+{
+    var book = await _db.Books.FirstOrDefaultAsync(b => b.Id == id);
+    if (book == null)
+        return NotFound($"Book with id {id} not found");
 
-        await _db.SaveChangesAsync();
-        return NoContent();
-    }
+    book.Title = dto.Title;
+    book.Author = dto.Author;
+    book.Description = dto.Description;
+    book.CoverImageUrl = dto.CoverImageUrl;
+    book.Year = dto.Year;
+
+    book.PdfUrl = dto.PdfUrl;
+    book.PreviewUrl = dto.PreviewUrl;
+
+    await _db.SaveChangesAsync();
+    return NoContent();
+}
 
     // DELETE: /api/Books/5
     [HttpDelete("{id:int}")]

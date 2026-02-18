@@ -18,6 +18,8 @@ export interface Book {
 
   // ✅ NEW: where to read as PDF
   pdfUrl?: string;
+  previewUrl?: string;
+
 }
 
 export interface UserBook extends Book {

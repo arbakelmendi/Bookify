@@ -45,7 +45,8 @@ const Discover = () => {
   const trending = visibleBooks.filter((b) => b.rating >= 4.5);
   const newReleases = visibleBooks.filter((b) => b.publishedYear >= 2023);
   const audiobooks = visibleBooks.filter((b) => b.isAudiobook);
-  const recommended = visibleBooks.slice(0, 6);
+  const recommended = visibleBooks;
+
 
   return (
     <div className="min-h-screen">

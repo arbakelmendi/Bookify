@@ -20,6 +20,10 @@ public class Book
 
     public int? Year { get; set; }
 
+    public string? PdfUrl { get; set; }
+    public string? PreviewUrl { get; set; }
+
+
 
 }
 

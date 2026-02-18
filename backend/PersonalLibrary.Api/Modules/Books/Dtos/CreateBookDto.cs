@@ -17,4 +17,8 @@ public class CreateBookDto
     public string CoverImageUrl { get; set; } = string.Empty;
 
     public int? Year { get; set; }
+
+    public string? PdfUrl { get; set; }
+    public string? PreviewUrl { get; set; }
+
 }

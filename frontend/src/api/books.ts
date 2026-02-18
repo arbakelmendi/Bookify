@@ -10,8 +10,9 @@ type ApiBook = {
   coverImageUrl?: string | null;
   year?: number | null;
 
-  // optional if backend ever adds it
+  // ✅ Hybrid fields (optional)
   pdfUrl?: string | null;
+  previewUrl?: string | null;
 };
 
 type PagedResponse<T> = {
@@ -27,9 +28,6 @@ const DEFAULT_COVER = "https://placehold.co/200x300/png?text=Book";
 export function mapApiBookToBook(apiBook: ApiBook): Book {
   const coverImageUrl = apiBook.coverImageUrl ?? "";
   const year = apiBook.year ?? undefined;
-
-  // ✅ PDF fallback from public folder if backend doesn't provide it
-  const fallbackPdf = `/pdfs/${apiBook.id}.pdf`;
 
   return {
     id: String(apiBook.id),
@@ -47,9 +45,12 @@ export function mapApiBookToBook(apiBook: ApiBook): Book {
     duration: undefined,
     isAudiobook: false,
 
-    pdfUrl: apiBook.pdfUrl ?? fallbackPdf,
+    // ✅ Hybrid: backend decides
+    pdfUrl: apiBook.pdfUrl ?? undefined,
+    previewUrl: apiBook.previewUrl ?? undefined,
   };
 }
+
 
 // ✅ IMPORTANT: fetch more than 10 (backend is paged)
 export async function getBooks(params?: {
