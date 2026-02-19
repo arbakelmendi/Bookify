@@ -26,12 +26,15 @@ public class RecommendationsController : ControllerBase
 
         if (!ok)
         {
-            if (error.Contains("Only friends", StringComparison.OrdinalIgnoreCase))
-                return Forbid();
+            // friends rule
+            if (error.Contains("not friends", StringComparison.OrdinalIgnoreCase))
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = error });
 
+            // not found
             if (error.Contains("not found", StringComparison.OrdinalIgnoreCase))
                 return NotFound(new { message = error });
 
+            // everything else
             return BadRequest(new { message = error });
         }
 
@@ -54,6 +57,49 @@ public class RecommendationsController : ControllerBase
         var userId = GetUserId();
         var data = await _service.SentAsync(userId);
         return Ok(data);
+    }
+
+    // POST: /api/Recommendations/{id}/accept
+    [HttpPost("{id:int}/accept")]
+    public async Task<IActionResult> Accept([FromRoute] int id)
+    {
+        var userId = GetUserId();
+        var (ok, error) = await _service.AcceptAsync(userId, id);
+
+        if (!ok)
+        {
+            if (error.Contains("not found", StringComparison.OrdinalIgnoreCase))
+                return NotFound(new { message = error });
+
+            if (error.Contains("only accept", StringComparison.OrdinalIgnoreCase) ||
+                error.Contains("not allowed", StringComparison.OrdinalIgnoreCase))
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = error });
+
+            return BadRequest(new { message = error });
+        }
+
+        return Ok(new { ok = true });
+    }
+
+    // DELETE: /api/Recommendations/{id}
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Delete([FromRoute] int id)
+    {
+        var userId = GetUserId();
+        var (ok, error) = await _service.DeleteAsync(userId, id);
+
+        if (!ok)
+        {
+            if (error.Contains("not found", StringComparison.OrdinalIgnoreCase))
+                return NotFound(new { message = error });
+
+            if (error.Contains("not allowed", StringComparison.OrdinalIgnoreCase))
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = error });
+
+            return BadRequest(new { message = error });
+        }
+
+        return Ok(new { ok = true });
     }
 
     private int GetUserId()

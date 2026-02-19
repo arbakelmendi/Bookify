@@ -26,8 +26,7 @@ import FriendProfile from "@/pages/FriendProfile";
 import NotFound from "@/pages/NotFound";
 import ImportBook from "@/pages/ImportBook";
 import BookReader from "@/pages/BookReader";
-
-
+import GiftsInbox from "@/pages/GiftsInbox";   // ✅ NEW
 
 import { api } from "@/lib/api";
 
@@ -52,6 +51,7 @@ const App = () => {
               <Navbar />
               <main className="flex-1">
                 <Routes>
+
                   {/* Public */}
                   <Route path="/" element={<Discover />} />
                   <Route path="/import" element={<ImportBook />} />
@@ -67,6 +67,7 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   />
+
                   <Route
                     path="/dashboard"
                     element={
@@ -75,6 +76,7 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   />
+
                   <Route
                     path="/friends"
                     element={
@@ -83,6 +85,17 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   />
+
+                  {/* ✅ NEW: Gifts Inbox */}
+                  <Route
+                    path="/gifts"
+                    element={
+                      <ProtectedRoute>
+                        <GiftsInbox />
+                      </ProtectedRoute>
+                    }
+                  />
+
                   <Route
                     path="/books/:id"
                     element={
@@ -91,6 +104,7 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   />
+
                   <Route
                     path="/books/:id/read"
                     element={
@@ -99,6 +113,7 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   />
+
                   <Route
                     path="/books/:id/audio"
                     element={
@@ -107,6 +122,7 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   />
+
                   <Route
                     path="/friend/:id"
                     element={

@@ -23,29 +23,60 @@ public class RecommendationService
              (fr.SenderId == userBId && fr.ReceiverId == userAId)));
     }
 
-    public async Task<(bool ok, string error, RecommendationDto? data)> SendAsync(int fromUserId, SendRecommendationDto dto)
+    public async Task<(bool ok, string error, RecommendationDto? data)> SendAsync(
+        int fromUserId,
+        SendRecommendationDto dto
+    )
     {
-        if (fromUserId == dto.ToUserId)
-            return (false, "You cannot send a recommendation to yourself.", null);
+        // 1) Validate receiver username
+        var toUsername = (dto.ToUsername ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(toUsername))
+            return (false, "Receiver username is required.", null);
 
-        var toUserExists = await _context.Users.AnyAsync(u => u.Id == dto.ToUserId);
-        if (!toUserExists)
+        // 2) Resolve receiver by username (case-insensitive)
+        // NOTE: ToUpper() is usually well-translated by EF for SQL Server
+        var toUser = await _context.Users.FirstOrDefaultAsync(u =>
+            u.Username != null && u.Username.ToUpper() == toUsername.ToUpper());
+
+        if (toUser == null)
             return (false, "Receiver user not found.", null);
 
+        if (fromUserId == toUser.Id)
+            return (false, "You cannot send a gift to yourself.", null);
+
+        // 3) Book exists
         var bookExists = await _context.Books.AnyAsync(b => b.Id == dto.BookId);
         if (!bookExists)
             return (false, "Book not found.", null);
 
-        var friends = await AreFriendsAsync(fromUserId, dto.ToUserId);
+        // 4) Friends-only rule
+        var friends = await AreFriendsAsync(fromUserId, toUser.Id);
         if (!friends)
-            return (false, "Only friends can send recommendations.", null);
+            return (false, "You are not friends.", null);
 
+        // 5) Receiver already has the book in library -> block
+        var receiverHasBook = await _context.UserBooks.AnyAsync(ub =>
+            ub.UserId == toUser.Id && ub.BookId == dto.BookId);
+
+        if (receiverHasBook)
+            return (false, "This friend already has this book in their library.", null);
+
+        // 6) Prevent duplicate gift (same sender -> same receiver -> same book)
+        var alreadyGifted = await _context.BookRecommendations.AnyAsync(r =>
+            r.FromUserId == fromUserId &&
+            r.ToUserId == toUser.Id &&
+            r.BookId == dto.BookId);
+
+        if (alreadyGifted)
+            return (false, "You already gifted this book to this friend.", null);
+
+        // 7) Create recommendation
         var rec = new BookRecommendation
         {
             FromUserId = fromUserId,
-            ToUserId = dto.ToUserId,
+            ToUserId = toUser.Id,
             BookId = dto.BookId,
-            Message = dto.Message,
+            Message = string.IsNullOrWhiteSpace(dto.Message) ? null : dto.Message.Trim(),
             CreatedAt = DateTime.UtcNow
         };
 
@@ -67,6 +98,7 @@ public class RecommendationService
     public async Task<List<RecommendationDto>> InboxAsync(int userId)
     {
         return await _context.BookRecommendations
+            .AsNoTracking()
             .Where(r => r.ToUserId == userId)
             .OrderByDescending(r => r.CreatedAt)
             .Select(r => new RecommendationDto(
@@ -78,11 +110,63 @@ public class RecommendationService
     public async Task<List<RecommendationDto>> SentAsync(int userId)
     {
         return await _context.BookRecommendations
+            .AsNoTracking()
             .Where(r => r.FromUserId == userId)
             .OrderByDescending(r => r.CreatedAt)
             .Select(r => new RecommendationDto(
                 r.Id, r.FromUserId, r.ToUserId, r.BookId, r.Message, r.CreatedAt
             ))
             .ToListAsync();
+    }
+
+    // ✅ Accept = add to receiver library + delete recommendation
+    public async Task<(bool ok, string error)> AcceptAsync(int userId, int recommendationId)
+    {
+        var rec = await _context.BookRecommendations
+            .FirstOrDefaultAsync(r => r.Id == recommendationId);
+
+        if (rec == null)
+            return (false, "Gift not found.");
+
+        if (rec.ToUserId != userId)
+            return (false, "You can only accept gifts sent to you.");
+
+        var existsInLibrary = await _context.UserBooks
+            .AnyAsync(ub => ub.UserId == userId && ub.BookId == rec.BookId);
+
+        if (!existsInLibrary)
+        {
+            var userBook = new UserBook
+            {
+                UserId = userId,
+                BookId = rec.BookId,
+                Status = "to-read"
+            };
+
+            _context.UserBooks.Add(userBook);
+        }
+
+        _context.BookRecommendations.Remove(rec);
+        await _context.SaveChangesAsync();
+
+        return (true, "");
+    }
+
+    // ✅ Delete in Inbox (receiver) or Cancel in Sent (sender)
+    public async Task<(bool ok, string error)> DeleteAsync(int userId, int recommendationId)
+    {
+        var rec = await _context.BookRecommendations
+            .FirstOrDefaultAsync(r => r.Id == recommendationId);
+
+        if (rec == null)
+            return (false, "Gift not found.");
+
+        if (rec.FromUserId != userId && rec.ToUserId != userId)
+            return (false, "Not allowed.");
+
+        _context.BookRecommendations.Remove(rec);
+        await _context.SaveChangesAsync();
+
+        return (true, "");
     }
 }

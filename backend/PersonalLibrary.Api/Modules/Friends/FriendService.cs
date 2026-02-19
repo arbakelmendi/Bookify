@@ -24,52 +24,57 @@ public class FriendService
         _notifications = notifications;
     }
 
-    // Pending incoming requests (that others sent to me)
+    // ✅ Pending incoming requests (that others sent to me)
     public async Task<List<FriendRequestViewDto>> GetIncomingAsync(int userId)
-{
-    return await _context.FriendRequests
-        .AsNoTracking()
-        .Where(fr => fr.ReceiverId == userId && fr.Status == FriendRequestStatuses.Pending)
-        .OrderByDescending(fr => fr.CreatedAt)
-        .Select(fr => new FriendRequestViewDto(
-            fr.Id,
-            fr.SenderId,
-            fr.Sender.Email,
-            fr.Sender.Username,
-            fr.ReceiverId,
-            fr.Receiver.Email,
-            fr.Receiver.Username,
-            fr.Status,
-            fr.CreatedAt,
-            fr.RespondedAt
-        ))
-        .ToListAsync();
-}
+    {
+        var query =
+            from fr in _context.FriendRequests.AsNoTracking()
+            join sender in _context.Users.AsNoTracking() on fr.SenderId equals sender.Id
+            join receiver in _context.Users.AsNoTracking() on fr.ReceiverId equals receiver.Id
+            where fr.ReceiverId == userId && fr.Status == FriendRequestStatuses.Pending
+            orderby fr.CreatedAt descending
+            select new FriendRequestViewDto(
+                fr.Id,
+                fr.SenderId,
+                sender.Email,
+                sender.Username,
+                fr.ReceiverId,
+                receiver.Email,
+                receiver.Username,
+                fr.Status,
+                fr.CreatedAt,
+                fr.RespondedAt
+            );
 
-public async Task<List<FriendRequestViewDto>> GetOutgoingAsync(int userId)
-{
-    return await _context.FriendRequests
-        .AsNoTracking()
-        .Where(fr => fr.SenderId == userId && fr.Status == FriendRequestStatuses.Pending)
-        .OrderByDescending(fr => fr.CreatedAt)
-        .Select(fr => new FriendRequestViewDto(
-            fr.Id,
-            fr.SenderId,
-            fr.Sender.Email,
-            fr.Sender.Username,
-            fr.ReceiverId,
-            fr.Receiver.Email,
-            fr.Receiver.Username,
-            fr.Status,
-            fr.CreatedAt,
-            fr.RespondedAt
-        ))
-        .ToListAsync();
-}
+        return await query.ToListAsync();
+    }
 
-    
+    // ✅ Pending outgoing requests (that I sent)
+    public async Task<List<FriendRequestViewDto>> GetOutgoingAsync(int userId)
+    {
+        var query =
+            from fr in _context.FriendRequests.AsNoTracking()
+            join sender in _context.Users.AsNoTracking() on fr.SenderId equals sender.Id
+            join receiver in _context.Users.AsNoTracking() on fr.ReceiverId equals receiver.Id
+            where fr.SenderId == userId && fr.Status == FriendRequestStatuses.Pending
+            orderby fr.CreatedAt descending
+            select new FriendRequestViewDto(
+                fr.Id,
+                fr.SenderId,
+                sender.Email,
+                sender.Username,
+                fr.ReceiverId,
+                receiver.Email,
+                receiver.Username,
+                fr.Status,
+                fr.CreatedAt,
+                fr.RespondedAt
+            );
 
-    // Accepted friends list
+        return await query.ToListAsync();
+    }
+
+    // ✅ Accepted friends list
     public async Task<List<object>> GetFriendsAsync(int userId)
     {
         var friendIds = await _context.FriendRequests
@@ -87,19 +92,16 @@ public async Task<List<FriendRequestViewDto>> GetOutgoingAsync(int userId)
         return friends.Cast<object>().ToList();
     }
 
-    // Send a friend request
+    // ✅ Send a friend request
     public async Task<(bool ok, string error, FriendRequestDto? data)> SendRequestAsync(int senderId, int receiverId)
     {
-        // prevent self-request
         if (senderId == receiverId)
             return (false, "You cannot send a friend request to yourself.", null);
 
-        // receiver must exist
         var receiverExists = await _context.Users.AnyAsync(u => u.Id == receiverId);
         if (!receiverExists)
             return (false, "Receiver user not found.", null);
 
-        // prevent duplicates: already friends?
         var alreadyFriends = await _context.FriendRequests.AnyAsync(fr =>
             fr.Status == FriendRequestStatuses.Accepted &&
             ((fr.SenderId == senderId && fr.ReceiverId == receiverId) ||
@@ -108,7 +110,6 @@ public async Task<List<FriendRequestViewDto>> GetOutgoingAsync(int userId)
         if (alreadyFriends)
             return (false, "You are already friends.", null);
 
-        // prevent duplicates: pending exists in either direction
         var pendingExists = await _context.FriendRequests.AnyAsync(fr =>
             fr.Status == FriendRequestStatuses.Pending &&
             ((fr.SenderId == senderId && fr.ReceiverId == receiverId) ||
@@ -137,7 +138,6 @@ public async Task<List<FriendRequestViewDto>> GetOutgoingAsync(int userId)
             return (false, "A pending friend request already exists between these users.", null);
         }
 
-        // ✅ Notification to receiver: friend request received
         await _notifications.CreateAsync(new Notification
         {
             UserId = receiverId,
@@ -160,7 +160,7 @@ public async Task<List<FriendRequestViewDto>> GetOutgoingAsync(int userId)
         return (true, "", dto);
     }
 
-    // Accept (only receiver can accept)
+    // ✅ Accept (only receiver can accept)
     public async Task<(bool ok, string error)> AcceptAsync(int userId, int requestId)
     {
         var req = await _context.FriendRequests.FirstOrDefaultAsync(fr => fr.Id == requestId);
@@ -177,7 +177,6 @@ public async Task<List<FriendRequestViewDto>> GetOutgoingAsync(int userId)
 
         await _context.SaveChangesAsync();
 
-        // ✅ Notification to sender: request accepted
         await _notifications.CreateAsync(new Notification
         {
             UserId = req.SenderId,
@@ -191,7 +190,7 @@ public async Task<List<FriendRequestViewDto>> GetOutgoingAsync(int userId)
         return (true, "");
     }
 
-    // Reject (only receiver can reject)
+    // ✅ Reject (only receiver can reject)
     public async Task<(bool ok, string error)> RejectAsync(int userId, int requestId)
     {
         var req = await _context.FriendRequests.FirstOrDefaultAsync(fr => fr.Id == requestId);
@@ -210,7 +209,7 @@ public async Task<List<FriendRequestViewDto>> GetOutgoingAsync(int userId)
         return (true, "");
     }
 
-    // Cancel (only sender can cancel; deletes pending request)
+    // ✅ Cancel (only sender can cancel; deletes pending request)
     public async Task<(bool ok, string error)> CancelAsync(int userId, int requestId)
     {
         var req = await _context.FriendRequests.FirstOrDefaultAsync(fr => fr.Id == requestId);
@@ -228,7 +227,7 @@ public async Task<List<FriendRequestViewDto>> GetOutgoingAsync(int userId)
         return (true, "");
     }
 
-    // Remove friend (deletes accepted relationship)
+    // ✅ Remove friend (deletes accepted relationship)
     public async Task<(bool ok, string error)> RemoveFriendAsync(int userId, int friendId)
     {
         var accepted = await _context.FriendRequests.FirstOrDefaultAsync(fr =>
