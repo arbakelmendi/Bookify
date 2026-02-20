@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, BookOpen, Bookmark, Gift, Plus, X } from "lucide-react";
+import { ArrowLeft, BookOpen, Gift, Plus, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,9 @@ import { usersApi } from "@/api/users";
 import { sendRecommendation } from "@/api/recommendations";
 import { getBookById, getBooks } from "@/api/books";
 import type { Book, UserBook } from "@/types/book";
-import { addToLibrary, updateLibraryStatus } from "@/api/userBooks";
-import { ReadingTracker } from "@/components/reading/ReadingTracker";
+import { addToLibrary } from "@/api/userBooks";
 import { BookSection } from "@/components/books/BookSection";
+import { FeedbackPanel } from "@/components/feedback/FeedbackPanel";
 
 type UserSearchItem = {
   id: number;
@@ -33,14 +33,12 @@ const BookDetail = () => {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
-  // ✅ Gift modal state
   const [giftOpen, setGiftOpen] = useState(false);
   const [toUsername, setToUsername] = useState("");
   const [giftMessage, setGiftMessage] = useState("");
   const [giftSending, setGiftSending] = useState(false);
   const [giftStatus, setGiftStatus] = useState<string | null>(null);
 
-  // ✅ Autocomplete state
   const [giftQuery, setGiftQuery] = useState("");
   const [giftResults, setGiftResults] = useState<UserSearchItem[]>([]);
   const [giftSearching, setGiftSearching] = useState(false);
@@ -72,7 +70,7 @@ const BookDetail = () => {
       }
     };
 
-    load();
+    void load();
     return () => {
       active = false;
     };
@@ -91,33 +89,7 @@ const BookDetail = () => {
       await addToLibrary(bookId, "to-read" as UserBook["status"]);
       navigate("/library");
     } catch (e) {
-      setAddError(
-        e instanceof Error ? e.message : "Failed to add book to library."
-      );
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  const handleSaveToRead = async () => {
-    if (!book) return;
-
-    setAdding(true);
-    setAddError(null);
-
-    try {
-      const bookId = Number(book.id);
-      if (Number.isNaN(bookId)) throw new Error("Invalid book id.");
-
-      try {
-        await addToLibrary(bookId, "to-read" as UserBook["status"]);
-      } catch {
-        await updateLibraryStatus(bookId, "to-read");
-      }
-
-      navigate("/library?filter=to-read");
-    } catch (e) {
-      setAddError(e instanceof Error ? e.message : "Failed to save book.");
+      setAddError(e instanceof Error ? e.message : "Failed to add book to library.");
     } finally {
       setAdding(false);
     }
@@ -140,7 +112,6 @@ const BookDetail = () => {
     setGiftSearching(false);
   };
 
-  // ✅ ESC to close modal
   useEffect(() => {
     if (!giftOpen) return;
 
@@ -153,7 +124,6 @@ const BookDetail = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [giftOpen, giftSending]);
 
-  // ✅ Close autocomplete when clicking outside input area
   useEffect(() => {
     if (!giftOpen) return;
 
@@ -167,32 +137,27 @@ const BookDetail = () => {
     return () => window.removeEventListener("mousedown", onDown);
   }, [giftOpen]);
 
-  // ✅ Autocomplete search (debounced)
   useEffect(() => {
     if (!giftOpen) return;
 
-    const q = giftQuery.trim();
-    setToUsername(q);
+    const query = giftQuery.trim();
+    setToUsername(query);
 
-    if (q.length < 2) {
+    if (query.length < 2) {
       setGiftResults([]);
       setGiftSearching(false);
       return;
     }
 
     let cancelled = false;
-    const t = window.setTimeout(async () => {
+    const timeout = window.setTimeout(async () => {
       try {
         setGiftSearching(true);
-        const res = (await usersApi.search(q)) as UserSearchItem[];
+        const res = (await usersApi.search(query)) as UserSearchItem[];
 
         if (cancelled) return;
 
-        // show up to 8 results, only those with username
-        const cleaned = (res ?? [])
-          .filter((u) => u?.username)
-          .slice(0, 8);
-
+        const cleaned = (res ?? []).filter((u) => u?.username).slice(0, 8);
         setGiftResults(cleaned);
       } catch {
         if (!cancelled) setGiftResults([]);
@@ -203,55 +168,52 @@ const BookDetail = () => {
 
     return () => {
       cancelled = true;
-      window.clearTimeout(t);
+      window.clearTimeout(timeout);
     };
   }, [giftQuery, giftOpen]);
 
-  const handlePickUser = (u: UserSearchItem) => {
-    setToUsername(u.username);
-    setGiftQuery(u.username);
+  const handlePickUser = (user: UserSearchItem) => {
+    setToUsername(user.username);
+    setGiftQuery(user.username);
     setGiftResults([]);
     setGiftStatus(null);
   };
 
   const handleSendGift = async () => {
-  if (!book) return;
+    if (!book) return;
 
-  const username = toUsername.trim();
-  if (!username) {
-    setGiftStatus("Write a valid friend username.");
-    return;
-  }
+    const username = toUsername.trim();
+    if (!username) {
+      setGiftStatus("Write a valid friend username.");
+      return;
+    }
 
-  setGiftSending(true);
-  setGiftStatus(null);
+    setGiftSending(true);
+    setGiftStatus(null);
 
-  try {
-    await sendRecommendation({
-      toUsername: username,
-      bookId: Number(book.id),
-      message: giftMessage.trim() ? giftMessage.trim() : null,
-    });
+    try {
+      await sendRecommendation({
+        toUsername: username,
+        bookId: Number(book.id),
+        message: giftMessage.trim() ? giftMessage.trim() : null,
+      });
 
-    // ✅ clean success message
-    setGiftStatus("Gift sent.");
+      setGiftStatus("Gift sent.");
 
-    window.setTimeout(() => {
-      closeGiftModal();
-    }, 650);
-  } catch (e: any) {
-    // ✅ client.ts tani jep veç mesazhin clean
-    setGiftStatus(e?.message ?? "Failed to send gift.");
-  } finally {
-    setGiftSending(false);
-  }
-};
-
+      window.setTimeout(() => {
+        closeGiftModal();
+      }, 650);
+    } catch (e: any) {
+      setGiftStatus(e?.message ?? "Failed to send gift.");
+    } finally {
+      setGiftSending(false);
+    }
+  };
 
   const coverSrc = useMemo(() => {
     return (
       book?.coverImageUrl ||
-      book?.cover ||
+      (book as any)?.cover ||
       "https://placehold.co/600x900/png?text=Book"
     );
   }, [book]);
@@ -259,13 +221,13 @@ const BookDetail = () => {
   const relatedBooks = useMemo(() => {
     if (!book) return [];
     return allBooks
-      .filter((b) => b.category === book.category && b.id !== book.id)
+      .filter((candidate) => candidate.category === book.category && candidate.id !== book.id)
       .slice(0, 8);
   }, [allBooks, book]);
 
   const moreFromAll = useMemo(() => {
     if (!book) return [];
-    return allBooks.filter((b) => b.id !== book.id).slice(0, 8);
+    return allBooks.filter((candidate) => candidate.id !== book.id).slice(0, 8);
   }, [allBooks, book]);
 
   if (loading) {
@@ -292,115 +254,96 @@ const BookDetail = () => {
   }
 
   return (
-    <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-6">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back
-        </Button>
+    <div className="min-h-screen flex flex-col">
+      <main className="flex-1">
+        <div className="container mx-auto px-4 py-8 max-w-5xl">
+          <Button variant="ghost" onClick={() => navigate(-1)} className="mb-6">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
 
-        <div className="grid md:grid-cols-[260px_1fr] gap-8">
-          <div className="space-y-3">
-            <img
-              src={coverSrc}
-              alt={book.title}
-              className="w-full h-[360px] object-cover rounded-xl border"
-              onError={(e) => {
-                e.currentTarget.src =
-                  "https://placehold.co/600x900/png?text=Book";
-              }}
-            />
-          </div>
-
-          <div className="space-y-4">
-            <Badge variant="secondary">{book.category}</Badge>
-
-            <h1 className="text-3xl font-bold">{book.title}</h1>
-            <p className="text-muted-foreground">
-              by{" "}
-              <span className="text-foreground font-medium">{book.author}</span>
-            </p>
-
-            <div className="text-sm text-muted-foreground">
-              <span>Published: {book.publishedYear || book.year || "—"}</span>
+          <div className="grid md:grid-cols-[260px_1fr] gap-8">
+            <div className="space-y-3">
+              <img
+                src={coverSrc}
+                alt={book.title}
+                className="w-full h-[360px] object-cover rounded-xl border"
+                onError={(e) => {
+                  e.currentTarget.src = "https://placehold.co/600x900/png?text=Book";
+                }}
+              />
             </div>
 
-            <Separator />
+            <div className="space-y-4">
+              <Badge variant="secondary">{book.category}</Badge>
 
-            <div>
-              <h3 className="font-semibold mb-2">About this book</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                {book.description || "No description available yet."}
+              <h1 className="text-3xl font-bold">{book.title}</h1>
+              <p className="text-muted-foreground">
+                by <span className="text-foreground font-medium">{book.author}</span>
               </p>
+
+              <div className="text-sm text-muted-foreground">
+                <span>Published: {book.publishedYear || (book as any)?.year || "-"}</span>
+              </div>
+
+              <FeedbackPanel bookId={Number(book.id)} mode="summary" />
+
+              <Separator />
+
+              <div>
+                <h3 className="font-semibold mb-2">About this book</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  {book.description || "No description available yet."}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3 pt-2">
+                <Button
+                  size="lg"
+                  className="gap-2"
+                  onClick={() => navigate(`/books/${book.id}/read`)}
+                >
+                  <BookOpen className="w-5 h-5" />
+                  Read Book
+                </Button>
+
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleAddToLibrary}
+                  disabled={adding}
+                >
+                  <Plus className="w-5 h-5" />
+                  {adding ? "Adding..." : "Add to Library"}
+                </Button>
+
+                <Button size="lg" variant="outline" className="gap-2" onClick={openGiftModal}>
+                  <Gift className="w-5 h-5" />
+                  Gift Book
+                </Button>
+              </div>
+
+              {addError && <p className="text-destructive text-sm">{addError}</p>}
             </div>
-
-            {/* ✅ ACTION BUTTONS */}
-            <div className="flex flex-wrap gap-3 pt-2">
-              <Button
-                size="lg"
-                className="gap-2"
-                onClick={() => navigate(`/books/${book.id}/read`)}
-              >
-                <BookOpen className="w-5 h-5" />
-                Read Book
-              </Button>
-
-              <Button
-                size="lg"
-                variant="outline"
-                className="gap-2"
-                onClick={handleAddToLibrary}
-                disabled={adding}
-              >
-                <Plus className="w-5 h-5" />
-                {adding ? "Adding..." : "Add to Library"}
-              </Button>
-
-              <Button
-                size="lg"
-                variant="outline"
-                className="gap-2"
-                onClick={handleSaveToRead}
-                disabled={adding}
-              >
-                <Bookmark className="w-5 h-5" />
-                {adding ? "Saving..." : "Save"}
-              </Button>
-
-              <Button
-                size="lg"
-                variant="outline"
-                className="gap-2"
-                onClick={openGiftModal}
-              >
-                <Gift className="w-5 h-5" />
-                Gift Book
-              </Button>
-            </div>
-
-            {addError && <p className="text-destructive text-sm">{addError}</p>}
-
-            <ReadingTracker bookId={Number(book.id)} />
           </div>
+
+          {relatedBooks.length > 0 && (
+            <div className="mt-12">
+              <BookSection title={`More in ${book.category}`} books={relatedBooks} />
+            </div>
+          )}
+
+          {moreFromAll.length > 0 && (
+            <div className="mt-12">
+              <BookSection title="More books" books={moreFromAll} />
+            </div>
+          )}
         </div>
 
-        {relatedBooks.length > 0 && (
-          <div className="mt-12">
-            <BookSection
-              title={`More in ${book.category}`}
-              books={relatedBooks}
-            />
-          </div>
-        )}
+        <FeedbackPanel bookId={Number(book.id)} mode="public" />
+      </main>
 
-        {moreFromAll.length > 0 && (
-          <div className="mt-12">
-            <BookSection title="More books" books={moreFromAll} />
-          </div>
-        )}
-      </div>
-
-      {/* ✅ Gift Modal (animated) */}
       <AnimatePresence>
         {giftOpen && (
           <motion.div
@@ -430,13 +373,10 @@ const BookDetail = () => {
               </div>
 
               <p className="mt-2 text-sm text-muted-foreground">
-                Send{" "}
-                <span className="font-medium text-foreground">{book.title}</span>{" "}
-                to a friend.
+                Send <span className="font-medium text-foreground">{book.title}</span> to a friend.
               </p>
 
               <div className="mt-4 space-y-3">
-                {/* ✅ AUTOCOMPLETE */}
                 <div className="space-y-1 relative" ref={inputWrapRef}>
                   <label className="text-sm font-medium">Friend username</label>
 
@@ -458,16 +398,14 @@ const BookDetail = () => {
 
                   {giftResults.length > 0 && (
                     <div className="absolute z-50 mt-1 w-full rounded-md border bg-background shadow-lg overflow-hidden">
-                      {giftResults.map((u) => (
+                      {giftResults.map((user) => (
                         <button
-                          key={u.id}
+                          key={user.id}
                           type="button"
-                          onClick={() => handlePickUser(u)}
+                          onClick={() => handlePickUser(user)}
                           className="w-full text-left px-3 py-2 hover:bg-muted"
                         >
-                          <span className="text-sm font-medium">
-                            {u.username}
-                          </span>
+                          <span className="text-sm font-medium">{user.username}</span>
                         </button>
                       ))}
                     </div>
@@ -496,13 +434,8 @@ const BookDetail = () => {
                   </p>
                 )}
 
-
                 <div className="flex justify-end gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={closeGiftModal}
-                    disabled={giftSending}
-                  >
+                  <Button variant="outline" onClick={closeGiftModal} disabled={giftSending}>
                     Cancel
                   </Button>
                   <Button onClick={handleSendGift} disabled={giftSending}>

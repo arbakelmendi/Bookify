@@ -11,6 +11,7 @@ public class AppDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<FriendRequest> FriendRequests => Set<FriendRequest>();
     public DbSet<BookRating> BookRatings => Set<BookRating>();
+    public DbSet<BookReview> BookReviews => Set<BookReview>();
     public DbSet<UserBook> UserBooks => Set<UserBook>();
     public DbSet<Author> Authors => Set<Author>();
     public DbSet<Category> Categories => Set<Category>();
@@ -21,24 +22,24 @@ public class AppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // BookRating unique: 1 user -> 1 rating per book
         modelBuilder.Entity<BookRating>()
             .HasIndex(br => new { br.UserId, br.BookId })
             .IsUnique();
 
-            
+        // Non-unique index to keep review queries fast while allowing multiple
+        // reviews per user for the same book.
+        modelBuilder.Entity<BookReview>()
+            .HasIndex(br => new { br.UserId, br.BookId });
+
         modelBuilder.Entity<UserBook>()
             .HasIndex(ub => new { ub.UserId, ub.BookId })
             .IsUnique();
 
-
-        // Prevent duplicate pending friend requests (same sender -> receiver)
         modelBuilder.Entity<FriendRequest>()
             .HasIndex(fr => new { fr.SenderId, fr.ReceiverId })
             .IsUnique()
-            .HasFilter("[Status] = 'Pending'"); // SQL Server filtered index
+            .HasFilter("[Status] = 'Pending'");
 
-        // FriendRequest relationships
         modelBuilder.Entity<FriendRequest>()
             .HasOne(fr => fr.Sender)
             .WithMany()
@@ -51,7 +52,6 @@ public class AppDbContext : DbContext
             .HasForeignKey(fr => fr.ReceiverId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // BookRecommendation relationships
         modelBuilder.Entity<BookRecommendation>()
             .HasOne(r => r.FromUser)
             .WithMany()
@@ -75,6 +75,5 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(n => n.UserId)
             .OnDelete(DeleteBehavior.Cascade);
-
     }
 }

@@ -16,34 +16,33 @@ public class RatingsController : ControllerBase
         _service = service;
     }
 
+    [AllowAnonymous]
+    [HttpGet("book/{bookId:int}/summary")]
+    public async Task<IActionResult> Summary(int bookId)
+        => Ok(await _service.GetSummaryAsync(bookId));
+
+    [Authorize]
+    [HttpGet("book/{bookId:int}/mine")]
+    public async Task<IActionResult> Mine(int bookId)
+        => Ok(await _service.GetMineAsync(GetUserId(), bookId));
+
+    [Authorize]
     [HttpPost]
-    public async Task<IActionResult> Rate([FromBody] CreateRatingDto dto)
-    {
-        var userId = GetUserId();
-        var result = await _service.RateAsync(userId, dto);
-        return Ok(result);
-    }
-
-    [HttpGet("book/{bookId:int}")]
-    public async Task<IActionResult> GetByBook(int bookId)
-    {
-        var data = await _service.GetByBookAsync(bookId);
-        return Ok(data);
-    }
-
-    [HttpGet("book/{bookId:int}/average")]
-    public async Task<IActionResult> GetAverage(int bookId)
-    {
-        var avg = await _service.GetAverageAsync(bookId);
-        return Ok(new { average = avg });
-    }
+    public async Task<IActionResult> Set([FromBody] SetRatingDto dto)
+        => Ok(await _service.UpsertAsync(GetUserId(), dto));
 
     private int GetUserId()
     {
-        var id =
+        var idStr =
             User.FindFirstValue(ClaimTypes.NameIdentifier) ??
             User.FindFirstValue("sub");
 
-        return int.Parse(id!);
+        if (string.IsNullOrWhiteSpace(idStr))
+            throw new UnauthorizedAccessException("Missing user id claim.");
+
+        if (!int.TryParse(idStr, out var id))
+            throw new UnauthorizedAccessException($"User id claim is not an int: '{idStr}'");
+
+        return id;
     }
 }

@@ -1,8 +1,12 @@
 namespace PersonalLibrary.Api.Modules.Ratings.Dtos;
 
-public record RatingDto(
-    int Id,
-    int UserId,
-    int BookId,
-    int Rating
-);
+public class RatingSummaryDto
+{
+    public double Average { get; set; }
+    public int Count { get; set; }
+}
+
+public class MyRatingDto
+{
+    public int? Value { get; set; }
+}

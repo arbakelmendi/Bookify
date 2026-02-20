@@ -13,6 +13,7 @@ using PersonalLibrary.Api.Modules.Reading;
 using System.Text;
 using PersonalLibrary.Api.Modules.Recommendations;
 using PersonalLibrary.Api.Modules.Notifications;
+using PersonalLibrary.Api.Modules.Reviews;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -80,6 +81,9 @@ builder.Services.AddScoped<AuthorsService>();
 builder.Services.AddScoped<CategoriesService>();
 builder.Services.AddScoped<RecommendationService>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<ReviewsService>();
+
+
 // DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));

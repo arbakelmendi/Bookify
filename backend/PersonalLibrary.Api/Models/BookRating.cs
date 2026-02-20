@@ -7,9 +7,8 @@ public class BookRating
     public int UserId { get; set; }
     public int BookId { get; set; }
 
-    // 1 - 5
-    public int Rating { get; set; }
+    public int Value { get; set; }
 
-    public User? User { get; set; }
-    public Book? Book { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
 }

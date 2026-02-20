@@ -89,15 +89,19 @@ namespace PersonalLibrary.Api.Migrations
                     b.Property<int>("BookId")
                         .HasColumnType("int");
 
-                    b.Property<int>("Rating")
-                        .HasColumnType("int");
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
-                    b.HasKey("Id");
+                    b.Property<int>("Value")
+                        .HasColumnType("int");
 
-                    b.HasIndex("BookId");
+                    b.HasKey("Id");
 
                     b.HasIndex("UserId", "BookId")
                         .IsUnique();
@@ -137,6 +141,37 @@ namespace PersonalLibrary.Api.Migrations
                     b.HasIndex("ToUserId");
 
                     b.ToTable("BookRecommendations");
+                });
+
+            modelBuilder.Entity("PersonalLibrary.Api.Models.BookReview", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BookId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "BookId");
+
+                    b.ToTable("BookReviews");
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.Category", b =>
@@ -312,25 +347,6 @@ namespace PersonalLibrary.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("UserBooks");
-                });
-
-            modelBuilder.Entity("PersonalLibrary.Api.Models.BookRating", b =>
-                {
-                    b.HasOne("PersonalLibrary.Api.Models.Book", "Book")
-                        .WithMany()
-                        .HasForeignKey("BookId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("PersonalLibrary.Api.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Book");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("PersonalLibrary.Api.Models.BookRecommendation", b =>

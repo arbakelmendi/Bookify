@@ -1,7 +1,7 @@
 namespace PersonalLibrary.Api.Modules.Ratings.Dtos;
 
-public class CreateRatingDto
+public class SetRatingDto
 {
     public int BookId { get; set; }
-    public int Rating { get; set; } // 1-5
+    public int Value { get; set; }
 }
