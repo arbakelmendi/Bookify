@@ -12,6 +12,7 @@ import { Footer } from "@/components/layout/Footer";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
+import ScrollToTop from "@/components/ScrollToTop";
 
 import Discover from "@/pages/Discover";
 import Library from "@/pages/Library";
@@ -46,6 +47,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <ScrollToTop />
           <AuthProvider>
             <div className="min-h-screen bg-background flex flex-col">
               <Navbar />

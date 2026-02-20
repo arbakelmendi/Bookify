@@ -6,6 +6,11 @@ type ApiUserBookFlat = {
   userId: number;
   bookId: number;
   status: string;
+  currentPage?: number;
+  pagesRead?: number;
+  totalPages?: number;
+  percent?: number;
+  lastUpdated?: string;
 
   title: string;
   author?: string | null;
@@ -33,7 +38,7 @@ const DEFAULT_COVER = "https://placehold.co/200x300/png?text=Book";
 function apiStatusToUi(status?: string): UserBook["status"] {
   const s = (status ?? "").toLowerCase();
   if (s === "completed" || s === "finished") return "finished";
-  if (s === "planned" || s === "to-read") return "to-read";
+  if (s === "planned" || s === "to-read" || s === "toread" || s === "to read") return "to-read";
   return "reading";
 }
 
@@ -69,10 +74,26 @@ export function mapApiUserBookToUserBook(x: ApiUserBookMaybeNested): UserBook {
     isAudiobook: false,
   };
 
+  const currentPage = Math.max(1, x.currentPage ?? 1);
+  const totalPages = Math.max(0, x.totalPages ?? 0);
+  const computedPercent = totalPages > 0 ? (currentPage * 100) / totalPages : 0;
+  const percent = Math.max(0, Math.min(100, x.percent ?? computedPercent));
+  const resolvedStatus: UserBook["status"] =
+    totalPages > 0 && currentPage >= totalPages
+      ? "finished"
+      : currentPage > 1
+        ? "reading"
+        : apiStatusToUi(x.status);
+
   return {
     ...base,
-    status: apiStatusToUi(x.status),
-    progress: 0,
+    status: resolvedStatus,
+    progress: Math.round(percent),
+    currentPage,
+    pagesRead: x.pagesRead ?? 0,
+    totalPages,
+    percent,
+    lastUpdated: x.lastUpdated,
     userRating: 0,
     dateAdded: new Date().toISOString(),
   };

@@ -56,6 +56,16 @@ public class ReadingController : ControllerBase
         return Ok(data);
     }
 
+    // GET /api/Reading/book/{bookId}/progress
+    [HttpGet("book/{bookId:int}/progress")]
+    public async Task<IActionResult> GetPdfProgress(int bookId)
+    {
+        var userId = GetUserId();
+        var data = await _service.GetPdfProgressAsync(userId, bookId);
+        if (data == null) return NotFound();
+        return Ok(data);
+    }
+
     /* ================= START ================= */
 
     // POST /api/Reading/start
@@ -76,6 +86,26 @@ public class ReadingController : ControllerBase
         var userId = GetUserId();
         var ok = await _service.UpdateProgressAsync(id, userId, dto);
         if (!ok) return NotFound();
+        return NoContent();
+    }
+
+    // PUT /api/Reading/book/{bookId}/progress
+    [HttpPut("book/{bookId:int}/progress")]
+    public async Task<IActionResult> UpsertPdfProgress(int bookId, [FromBody] UpdatePdfProgressDto dto)
+    {
+        var userId = GetUserId();
+        var result = await _service.UpsertPdfProgressAsync(userId, bookId, dto);
+
+        if (result.missingTotalPages)
+        {
+            return BadRequest("TotalPages must be provided and > 0 when creating progress.");
+        }
+
+        if (result.created && result.dto != null)
+        {
+            return CreatedAtAction(nameof(GetPdfProgress), new { bookId }, result.dto);
+        }
+
         return NoContent();
     }
 

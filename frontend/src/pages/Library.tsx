@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LibraryCard } from "@/components/library/LibraryCard";
 import { UserBook, ReadingStatus } from "@/types/book";
-import { getMyLibrary, updateLibraryStatus } from "@/api/userBooks";
+import { getMyLibrary, removeFromLibrary, updateLibraryStatus } from "@/api/userBooks";
 import { useSearchParams } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 
 function normalizeStatus(s?: string) {
@@ -27,6 +28,7 @@ const Library = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ReadingStatus | "all">("all");
+  const { toast } = useToast();
 
   const load = async (activeRef?: { current: boolean }) => {
     try {
@@ -101,8 +103,20 @@ const Library = () => {
     }
   };
 
-  const handleRatingChange = (id: string, rating: number) => {
-    setBooks((prev) => prev.map((book) => (book.id === id ? { ...book, userRating: rating } : book)));
+  const handleRemove = async (id: string) => {
+    const bookId = Number(id);
+    if (Number.isNaN(bookId)) return;
+
+    const previous = books;
+    setBooks((prev) => prev.filter((book) => book.id !== id));
+
+    try {
+      await removeFromLibrary(bookId);
+      toast({ title: "Removed from library" });
+    } catch (e) {
+      setBooks(previous);
+      setError(e instanceof Error ? e.message : "Failed to remove book.");
+    }
   };
 
   return (
@@ -154,14 +168,14 @@ const Library = () => {
 
         {error && <p className="text-destructive mb-4">{error}</p>}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
           {filteredBooks.map((book, index) => (
             <LibraryCard
               key={book.id}
               book={book}
               index={index}
               onStatusChange={handleStatusChange}
-              onRatingChange={handleRatingChange}
+              onRemove={handleRemove}
             />
           ))}
         </div>

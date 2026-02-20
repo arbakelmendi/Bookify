@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { usersApi } from "@/api/users";
 import { sendRecommendation } from "@/api/recommendations";
 import { getBookById, getBooks } from "@/api/books";
+import { getPdfProgress, type PdfProgressViewDto } from "@/api/reading";
 import type { Book, UserBook } from "@/types/book";
 import { addToLibrary } from "@/api/userBooks";
 import { BookSection } from "@/components/books/BookSection";
@@ -29,6 +30,8 @@ const BookDetail = () => {
   const [allBooks, setAllBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [readingProgress, setReadingProgress] = useState<PdfProgressViewDto | null>(null);
+  const [progressLoading, setProgressLoading] = useState(true);
 
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -71,6 +74,37 @@ const BookDetail = () => {
     };
 
     void load();
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const numericBookId = Number(id);
+    if (Number.isNaN(numericBookId)) {
+      setReadingProgress(null);
+      setProgressLoading(false);
+      return;
+    }
+
+    let active = true;
+
+    (async () => {
+      try {
+        setProgressLoading(true);
+        const progress = await getPdfProgress(numericBookId);
+        if (!active) return;
+        setReadingProgress(progress);
+      } catch {
+        if (!active) return;
+        setReadingProgress(null);
+      } finally {
+        if (active) setProgressLoading(false);
+      }
+    })();
+
     return () => {
       active = false;
     };
@@ -230,6 +264,19 @@ const BookDetail = () => {
     return allBooks.filter((candidate) => candidate.id !== book.id).slice(0, 8);
   }, [allBooks, book]);
 
+  const readButtonLabel = useMemo(() => {
+    if (progressLoading) return "Read Book";
+
+    if (
+      readingProgress &&
+      ((readingProgress.currentPage ?? 1) > 1 || readingProgress.status === "Reading")
+    ) {
+      return "Continue reading";
+    }
+
+    return "Start reading";
+  }, [progressLoading, readingProgress]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -256,7 +303,7 @@ const BookDetail = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <main className="flex-1">
-        <div className="container mx-auto px-4 py-8 max-w-5xl">
+        <div className="mx-auto max-w-7xl px-6 lg:px-8 py-8">
           <Button variant="ghost" onClick={() => navigate(-1)} className="mb-6">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
@@ -302,9 +349,10 @@ const BookDetail = () => {
                   size="lg"
                   className="gap-2"
                   onClick={() => navigate(`/books/${book.id}/read`)}
+                  disabled={progressLoading}
                 >
                   <BookOpen className="w-5 h-5" />
-                  Read Book
+                  {readButtonLabel}
                 </Button>
 
                 <Button
@@ -323,6 +371,12 @@ const BookDetail = () => {
                   Gift Book
                 </Button>
               </div>
+
+              {!progressLoading && readButtonLabel === "Continue reading" && readingProgress && (
+                <p className="text-sm text-muted-foreground">
+                  Resume at page {Math.max(1, readingProgress.currentPage ?? 1)}
+                </p>
+              )}
 
               {addError && <p className="text-destructive text-sm">{addError}</p>}
             </div>

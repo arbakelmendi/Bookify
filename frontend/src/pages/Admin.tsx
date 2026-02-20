@@ -17,6 +17,10 @@ import {
   UserPlus,
   Edit,
   Plus,
+  MessageSquare,
+  Star,
+  Check,
+  X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -74,6 +78,13 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiDelete, apiGet, apiPost, apiPut } from "@/api/client";
+import {
+  createAdminReview,
+  deleteAdminReview,
+  getAdminReviews,
+  type AdminReviewDto,
+  patchAdminReview,
+} from "@/api/adminReviews";
 import type { User } from "@/types/auth";
 
 import {
@@ -218,6 +229,36 @@ const Admin = () => {
   const [bookForm, setBookForm] = useState<BookFormState>(emptyBookForm());
   const [bookFormLoading, setBookFormLoading] = useState(false);
 
+  // REVIEWS
+  const [reviews, setReviews] = useState<AdminReviewDto[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState<string | null>(null);
+  const [reviewSearchInput, setReviewSearchInput] = useState("");
+  const [reviewSearch, setReviewSearch] = useState("");
+  const [reviewUserFilter, setReviewUserFilter] = useState<string>("all");
+  const [reviewBookFilter, setReviewBookFilter] = useState<string>("all");
+  const [reviewRatingFilter, setReviewRatingFilter] = useState<string>("all");
+  const [reviewPage, setReviewPage] = useState(1);
+  const [reviewPageSize, setReviewPageSize] = useState<10 | 20 | 50>(10);
+  const [reviewTotalItems, setReviewTotalItems] = useState(0);
+  const [reviewTotalPages, setReviewTotalPages] = useState(1);
+
+  const [createReviewDialogOpen, setCreateReviewDialogOpen] = useState(false);
+  const [reviewDeleteDialogOpen, setReviewDeleteDialogOpen] = useState(false);
+  const [reviewToDelete, setReviewToDelete] = useState<AdminReviewDto | null>(null);
+  const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState<{ rating: number; comment: string }>({
+    rating: 5,
+    comment: "",
+  });
+  const [reviewFormLoading, setReviewFormLoading] = useState(false);
+  const [reviewForm, setReviewForm] = useState({
+    bookId: "",
+    rating: "5",
+    comment: "",
+  });
+  const [reviewCreateBookSearch, setReviewCreateBookSearch] = useState("");
+
   // Redirect if not admin
   if (!isAdmin) return <Navigate to="/login" replace />;
 
@@ -270,11 +311,57 @@ const Admin = () => {
     }
   };
 
+  const fetchReviews = async () => {
+    try {
+      setReviewsLoading(true);
+      setReviewsError(null);
+
+      const data = await getAdminReviews({
+        search: reviewSearch.trim() || undefined,
+        userId: reviewUserFilter === "all" ? undefined : Number(reviewUserFilter),
+        bookId: reviewBookFilter === "all" ? undefined : Number(reviewBookFilter),
+        minRating: reviewRatingFilter === "all" ? undefined : Number(reviewRatingFilter),
+        maxRating: reviewRatingFilter === "all" ? undefined : Number(reviewRatingFilter),
+        page: reviewPage,
+        pageSize: reviewPageSize,
+      });
+
+      setReviews(data.items ?? []);
+      setReviewTotalItems(data.totalItems ?? 0);
+      setReviewTotalPages(Math.max(1, data.totalPages ?? 1));
+    } catch (error) {
+      console.error("Failed to fetch reviews:", error);
+      setReviewsError(error instanceof Error ? error.message : "Failed to load reviews.");
+      toast({
+        title: "Error",
+        description: "Failed to load reviews. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchBooks();
+    fetchReviews();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setReviewSearch(reviewSearchInput), 400);
+    return () => window.clearTimeout(t);
+  }, [reviewSearchInput]);
+
+  useEffect(() => {
+    fetchReviews();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewSearch, reviewUserFilter, reviewBookFilter, reviewRatingFilter, reviewPage, reviewPageSize]);
+
+  useEffect(() => {
+    setReviewPage(1);
+  }, [reviewSearch, reviewUserFilter, reviewBookFilter, reviewRatingFilter, reviewPageSize]);
 
   // Filter users based on search
   const filteredUsers = useMemo(() => {
@@ -534,6 +621,133 @@ const Admin = () => {
     }
   };
 
+  const resetReviewForm = () => {
+    setReviewForm({
+      bookId: "",
+      rating: "5",
+      comment: "",
+    });
+  };
+
+  const handleCreateReview = async () => {
+    if (!reviewForm.bookId) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a book.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setReviewFormLoading(true);
+      await createAdminReview({
+        bookId: Number(reviewForm.bookId),
+        rating: Number(reviewForm.rating),
+        comment: reviewForm.comment.trim() || null,
+      });
+
+      toast({
+        title: "Review Created",
+        description: "Review has been created successfully.",
+      });
+
+      setCreateReviewDialogOpen(false);
+      resetReviewForm();
+      setReviewPage(1);
+      if (reviewPage === 1) {
+        fetchReviews();
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to create review. Please try again.";
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setReviewFormLoading(false);
+    }
+  };
+
+  const startInlineEdit = (review: AdminReviewDto) => {
+    setEditingReviewId(review.id);
+    setEditDraft({
+      rating: review.rating,
+      comment: review.comment ?? "",
+    });
+  };
+
+  const cancelInlineEdit = () => {
+    setEditingReviewId(null);
+  };
+
+  const handleInlineSave = async (review: AdminReviewDto) => {
+    try {
+      setReviewFormLoading(true);
+
+      const payload: { rating?: number; comment?: string | null } = {};
+      if (editDraft.rating !== review.rating) payload.rating = editDraft.rating;
+      if ((editDraft.comment ?? "") !== (review.comment ?? "")) {
+        payload.comment = editDraft.comment.trim() || null;
+      }
+
+      if (Object.keys(payload).length === 0) {
+        setEditingReviewId(null);
+        return;
+      }
+
+      const updated = await patchAdminReview(review.id, payload);
+      setReviews((prev) =>
+        prev.map((r) =>
+          r.id === review.id ? (updated ? updated : { ...r, ...payload, updatedAt: new Date().toISOString() }) : r
+        )
+      );
+      setEditingReviewId(null);
+      toast({ title: "Review updated" });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update review.",
+        variant: "destructive",
+      });
+    } finally {
+      setReviewFormLoading(false);
+    }
+  };
+
+  const handleDeleteReview = async () => {
+    if (!reviewToDelete) return;
+
+    try {
+      await deleteAdminReview(reviewToDelete.id);
+      toast({
+        title: "Review Deleted",
+        description: "Review has been deleted successfully.",
+      });
+      setReviewDeleteDialogOpen(false);
+      setReviewToDelete(null);
+      const shouldGoPrevPage = reviews.length === 1 && reviewPage > 1;
+      if (shouldGoPrevPage) {
+        setReviewPage((prev) => Math.max(1, prev - 1));
+      } else {
+        fetchReviews();
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete review. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const stats = [
     {
       title: "Total Users",
@@ -564,6 +778,32 @@ const Admin = () => {
       changeType: "positive" as const,
     },
   ];
+
+  const renderStars = (
+    value: number,
+    onClick?: (v: number) => void
+  ) => (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((v) => (
+        <button
+          key={v}
+          type="button"
+          disabled={!onClick}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick?.(v);
+          }}
+          className={onClick ? "cursor-pointer" : "cursor-default"}
+        >
+          <Star
+            className={`w-4 h-4 ${
+              value >= v ? "fill-primary text-primary" : "text-muted-foreground"
+            }`}
+          />
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -625,7 +865,7 @@ const Admin = () => {
 
           {/* Main Content */}
           <Tabs defaultValue="users" className="space-y-6">
-            <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsList className="grid w-full max-w-2xl grid-cols-4">
               <TabsTrigger value="users" className="gap-2">
                 <Users className="w-4 h-4" />
                 Users
@@ -637,6 +877,10 @@ const Admin = () => {
               <TabsTrigger value="books" className="gap-2">
                 <BookOpen className="w-4 h-4" />
                 Books
+              </TabsTrigger>
+              <TabsTrigger value="reviews" className="gap-2">
+                <MessageSquare className="w-4 h-4" />
+                Reviews
               </TabsTrigger>
             </TabsList>
 
@@ -1006,6 +1250,261 @@ const Admin = () => {
                       </TableBody>
                     </Table>
                   )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Reviews Tab */}
+            <TabsContent value="reviews">
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <CardTitle>Ratings & Reviews</CardTitle>
+                      <CardDescription>Manage all user ratings and review comments</CardDescription>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="relative w-full sm:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by user/book/comment..."
+                          value={reviewSearchInput}
+                          onChange={(e) => setReviewSearchInput(e.target.value)}
+                          className="pl-9"
+                        />
+                      </div>
+
+                      <Select value={reviewRatingFilter} onValueChange={setReviewRatingFilter}>
+                        <SelectTrigger className="w-28">
+                          <SelectValue placeholder="Rating" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All ratings</SelectItem>
+                          <SelectItem value="5">5 stars</SelectItem>
+                          <SelectItem value="4">4 stars</SelectItem>
+                          <SelectItem value="3">3 stars</SelectItem>
+                          <SelectItem value="2">2 stars</SelectItem>
+                          <SelectItem value="1">1 star</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={reviewUserFilter} onValueChange={setReviewUserFilter}>
+                        <SelectTrigger className="w-44">
+                          <SelectValue placeholder="User" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All users</SelectItem>
+                          {users.map((u) => (
+                            <SelectItem key={u.id} value={String(u.id)}>
+                              {u.username} ({u.email})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={reviewBookFilter} onValueChange={setReviewBookFilter}>
+                        <SelectTrigger className="w-56">
+                          <SelectValue placeholder="Book" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All books</SelectItem>
+                          {books.map((b) => (
+                            <SelectItem key={b.id} value={String(b.id)}>
+                              {b.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Select
+                        value={String(reviewPageSize)}
+                        onValueChange={(value) => setReviewPageSize(Number(value) as 10 | 20 | 50)}
+                      >
+                        <SelectTrigger className="w-24">
+                          <SelectValue placeholder="Size" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={fetchReviews}
+                        title="Refresh reviews"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </Button>
+
+                      <Button
+                        onClick={() => {
+                          resetReviewForm();
+                          setReviewCreateBookSearch("");
+                          setCreateReviewDialogOpen(true);
+                        }}
+                        className="gap-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Review
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent>
+                  {reviewsLoading ? (
+                    <div className="text-center py-12">
+                      <RefreshCw className="w-8 h-8 mx-auto mb-4 animate-spin text-primary" />
+                      <p className="text-muted-foreground">Loading reviews...</p>
+                    </div>
+                  ) : reviewsError ? (
+                    <p className="text-destructive">{reviewsError}</p>
+                  ) : reviews.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>No reviews found</p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>User</TableHead>
+                          <TableHead>Book</TableHead>
+                          <TableHead>Rating</TableHead>
+                          <TableHead>Comment</TableHead>
+                          <TableHead>Updated / Created</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reviews.map((review) => (
+                          <TableRow key={review.id}>
+                            <TableCell>
+                              <div className="font-medium">{review.username}</div>
+                              <div className="text-xs text-muted-foreground">{review.email}</div>
+                            </TableCell>
+                            <TableCell className="max-w-[260px] truncate">{review.bookTitle}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {editingReviewId === review.id
+                                  ? renderStars(editDraft.rating, (v) =>
+                                      setEditDraft((prev) => ({ ...prev, rating: v }))
+                                    )
+                                  : renderStars(review.rating)}
+                                <span className="text-sm text-muted-foreground">
+                                  {editingReviewId === review.id ? editDraft.rating : review.rating}/5
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="max-w-[320px]">
+                              {editingReviewId === review.id ? (
+                                <Input
+                                  value={editDraft.comment}
+                                  onChange={(e) =>
+                                    setEditDraft((prev) => ({ ...prev, comment: e.target.value }))
+                                  }
+                                  placeholder="Optional comment"
+                                />
+                              ) : (
+                                <div className="truncate">{review.comment || "-"}</div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                <div>{new Date(review.updatedAt ?? review.createdAt).toLocaleString()}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  Created: {new Date(review.createdAt).toLocaleDateString()}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {editingReviewId === review.id ? (
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleInlineSave(review)}
+                                    disabled={reviewFormLoading}
+                                  >
+                                    <Check className="w-4 h-4 text-green-600" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={cancelInlineEdit}
+                                    disabled={reviewFormLoading}
+                                  >
+                                    <X className="w-4 h-4 text-muted-foreground" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                      <MoreHorizontal className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => startInlineEdit(review)}>
+                                      <Edit className="w-4 h-4 mr-2" />
+                                      Edit Review
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="text-destructive"
+                                      onClick={() => {
+                                        setReviewToDelete(review);
+                                        setReviewDeleteDialogOpen(true);
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Delete Review
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+
+                  <div className="mt-4 flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      {reviewTotalItems === 0
+                        ? "Showing 0 of 0"
+                        : `Showing ${(reviewPage - 1) * reviewPageSize + 1}-${Math.min(
+                            reviewPage * reviewPageSize,
+                            reviewTotalItems
+                          )} of ${reviewTotalItems}`}
+                    </p>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReviewPage((p) => Math.max(1, p - 1))}
+                        disabled={reviewPage <= 1 || reviewsLoading}
+                      >
+                        Prev
+                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        Page {reviewPage} / {reviewTotalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReviewPage((p) => Math.min(reviewTotalPages, p + 1))}
+                        disabled={reviewPage >= reviewTotalPages || reviewsLoading}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -1391,6 +1890,96 @@ const Admin = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteBook}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Create Review Dialog */}
+      <Dialog open={createReviewDialogOpen} onOpenChange={setCreateReviewDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Review</DialogTitle>
+            <DialogDescription>Create a rating/review as your admin account.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Book</Label>
+              <Input
+                value={reviewCreateBookSearch}
+                onChange={(e) => setReviewCreateBookSearch(e.target.value)}
+                placeholder="Search book..."
+              />
+              <Select
+                value={reviewForm.bookId}
+                onValueChange={(value) => setReviewForm((prev) => ({ ...prev, bookId: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select book" />
+                </SelectTrigger>
+                <SelectContent>
+                  {books
+                    .filter((b) => {
+                      const q = reviewCreateBookSearch.trim().toLowerCase();
+                      if (!q) return true;
+                      return (b.title ?? "").toLowerCase().includes(q);
+                    })
+                    .map((b) => (
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      {b.title}
+                    </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Rating</Label>
+              <div className="flex items-center gap-2">
+                {renderStars(Number(reviewForm.rating), (v) =>
+                  setReviewForm((prev) => ({ ...prev, rating: String(v) }))
+                )}
+                <span className="text-sm text-muted-foreground">{reviewForm.rating}/5</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Comment</Label>
+              <Input
+                value={reviewForm.comment}
+                onChange={(e) => setReviewForm((prev) => ({ ...prev, comment: e.target.value }))}
+                placeholder="Optional comment"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateReviewDialogOpen(false)} disabled={reviewFormLoading}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateReview} disabled={reviewFormLoading}>
+              {reviewFormLoading ? "Saving..." : "Create Review"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Review Confirmation */}
+      <AlertDialog open={reviewDeleteDialogOpen} onOpenChange={setReviewDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Review</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this review for <b>{reviewToDelete?.bookTitle}</b> by{" "}
+              <b>{reviewToDelete?.username}</b>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteReview}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete

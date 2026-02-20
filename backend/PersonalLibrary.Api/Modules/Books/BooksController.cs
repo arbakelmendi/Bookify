@@ -13,10 +13,12 @@ namespace PersonalLibrary.Api.Modules.Books;
 public class BooksController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public BooksController(AppDbContext db)
+    public BooksController(AppDbContext db, IHttpClientFactory httpClientFactory)
     {
         _db = db;
+        _httpClientFactory = httpClientFactory;
     }
 
     // GET: /api/Books?search=&title=&author=&year=&page=1&pageSize=10&sortBy=title&sortDir=asc
@@ -172,5 +174,30 @@ public async Task<IActionResult> Update(int id, [FromBody] UpdateBookDto dto)
         if (result is null) return NotFound();
 
         return Ok(result);
+    }
+
+    // GET: /api/Books/{id}/pdf-proxy
+    [HttpGet("{id:int}/pdf-proxy")]
+    public async Task<IActionResult> PdfProxy(int id)
+    {
+        var book = await _db.Books.AsNoTracking().FirstOrDefaultAsync(b => b.Id == id);
+        if (book == null) return NotFound($"Book with id {id} not found");
+        if (string.IsNullOrWhiteSpace(book.PdfUrl)) return NotFound("PDF URL is not configured for this book.");
+
+        if (!Uri.TryCreate(book.PdfUrl, UriKind.Absolute, out var pdfUri))
+            return BadRequest("Invalid PDF URL.");
+
+        var client = _httpClientFactory.CreateClient();
+        var upstream = await client.GetAsync(pdfUri, HttpCompletionOption.ResponseHeadersRead, HttpContext.RequestAborted);
+        if (!upstream.IsSuccessStatusCode)
+        {
+            return StatusCode((int)upstream.StatusCode, "Unable to fetch PDF from upstream source.");
+        }
+
+        var contentType = upstream.Content.Headers.ContentType?.MediaType ?? "application/pdf";
+        var stream = await upstream.Content.ReadAsStreamAsync(HttpContext.RequestAborted);
+        HttpContext.Response.RegisterForDispose(upstream);
+        HttpContext.Response.RegisterForDispose(stream);
+        return File(stream, contentType);
     }
 }

@@ -1,7 +1,6 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Star, MoreVertical } from "lucide-react";
+import { MoreVertical, BookOpen, Trash2 } from "lucide-react";
 import { UserBook, ReadingStatus } from "@/types/book";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -16,7 +15,7 @@ interface LibraryCardProps {
   book: UserBook;
   index?: number;
   onStatusChange?: (id: string, status: ReadingStatus) => void;
-  onRatingChange?: (id: string, rating: number) => void;
+  onRemove?: (id: string) => void;
 }
 
 const statusColors: Record<ReadingStatus, string> = {
@@ -35,11 +34,21 @@ export const LibraryCard = ({
   book, 
   index = 0, 
   onStatusChange,
-  onRatingChange 
+  onRemove
 }: LibraryCardProps) => {
-  const [hoveredStar, setHoveredStar] = useState(0);
   const navigate = useNavigate();
   const coverSrc = book.coverImageUrl || book.cover || "https://placehold.co/200x300/png?text=Book";
+  const currentPage = Math.max(1, book.currentPage ?? 1);
+  const totalPages = Math.max(0, book.totalPages ?? 0);
+  const percent = Math.max(
+    0,
+    Math.min(100, book.percent ?? (totalPages > 0 ? (currentPage * 100) / totalPages : 0))
+  );
+  const isFinished =
+    book.status === "finished" || (totalPages > 0 && currentPage >= totalPages);
+  const isReading =
+    book.status === "reading" || (currentPage > 1 && (totalPages <= 0 || currentPage < totalPages));
+  const readingCtaLabel = isFinished ? "Read again" : isReading ? "Continue reading" : "Start reading";
 
   const handleNavigate = () => {
     navigate(`/books/${book.id}`);
@@ -50,10 +59,10 @@ export const LibraryCard = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05, duration: 0.3 }}
-      className="glass-card group relative rounded-xl overflow-hidden cursor-pointer"
+      className="glass-card group relative rounded-xl overflow-hidden cursor-pointer h-full min-h-[240px] flex flex-col"
       onClick={handleNavigate}
     >
-      <div className="flex gap-4 p-4">
+      <div className="flex gap-4 p-4 h-full flex-1">
         <img
           src={coverSrc}
           alt={book.title}
@@ -63,7 +72,7 @@ export const LibraryCard = ({
           }}
         />
         
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex flex-col">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <h3 className="font-semibold text-foreground line-clamp-1">
@@ -98,6 +107,13 @@ export const LibraryCard = ({
                 <DropdownMenuItem onClick={() => onStatusChange?.(book.id, "finished")}>
                   Mark as Finished
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => onRemove?.(book.id)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Remove from Library
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -108,37 +124,31 @@ export const LibraryCard = ({
             </span>
           </div>
 
-          {book.status === "reading" && (
-            <div className="mt-3">
-              <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                <span>Progress</span>
-                <span>{book.progress}%</span>
-              </div>
-              <Progress value={book.progress} className="h-1.5" />
+          <div className="mt-3 h-[56px]">
+            <div className="flex justify-between text-xs text-muted-foreground mb-1">
+              <span>Progress</span>
+              <span>{Math.round(isReading || isFinished ? percent : 0)}%</span>
             </div>
-          )}
+            <Progress value={isReading || isFinished ? percent : 0} className="h-1.5" />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {isReading || isFinished
+                ? `Page ${currentPage} of ${totalPages || "?"}`
+                : "Not started"}
+            </p>
+          </div>
 
-          <div className="mt-3 flex items-center gap-0.5">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                onMouseEnter={() => setHoveredStar(star)}
-                onMouseLeave={() => setHoveredStar(0)}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRatingChange?.(book.id, star);
-                }}
-                className="p-0.5"
-              >
-                <Star
-                  className={`w-4 h-4 transition-colors ${
-                    star <= (hoveredStar || book.userRating || 0)
-                      ? "text-primary fill-primary"
-                      : "text-muted-foreground"
-                  }`}
-                />
-              </button>
-            ))}
+          <div className="mt-auto pt-3">
+            <Button
+              size="sm"
+              className="w-full gap-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/books/${book.id}/read`);
+              }}
+            >
+              <BookOpen className="w-4 h-4" />
+              {readingCtaLabel}
+            </Button>
           </div>
         </div>
       </div>

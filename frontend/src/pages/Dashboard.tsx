@@ -6,10 +6,13 @@ import {
   Clock,
   TrendingUp,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { apiGet } from "@/api/client";
-import { mockUserBooks } from "@/data/mockData";
+import { Button } from "@/components/ui/button";
+import { getMyLibrary } from "@/api/userBooks";
+import type { UserBook } from "@/types/book";
 import {
   AreaChart,
   Area,
@@ -22,154 +25,169 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { useEffect, useMemo, useState } from "react";
 
-type ApiBook = {
-  id: number;
-  title: string;
-  author: string | null;
-  year: number | null;
-};
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-// ✅ Paged response from backend: { items, page, pageSize, totalCount, totalPages }
-type PagedResponse<T> = {
-  items: T[];
-  page: number;
-  pageSize: number;
-  totalCount: number;
-  totalPages: number;
-};
+function getCurrentPage(book: UserBook) {
+  return Math.max(1, book.currentPage ?? 1);
+}
 
-// Ky tip është vetëm për UI-në që e ke tash (mockUserBooks)
-type UiBook = {
-  id: number | string;
-  title: string;
-  author?: string;
-  year?: number;
-  cover?: string;
-  progress?: number;
-  status?: "reading" | "finished" | "to-read";
-};
+function getTotalPages(book: UserBook) {
+  return Math.max(0, book.totalPages ?? 0);
+}
+
+function getPercent(book: UserBook) {
+  const cp = getCurrentPage(book);
+  const tp = getTotalPages(book);
+  const computed = tp > 0 ? Math.round((cp * 100) / tp) : 0;
+  const raw = book.percent ?? computed;
+  return Math.max(0, Math.min(100, Math.round(raw)));
+}
+
+function isReading(book: UserBook) {
+  const cp = getCurrentPage(book);
+  const tp = getTotalPages(book);
+  return book.status === "reading" || (cp > 1 && (tp <= 0 || cp < tp));
+}
+
+function isFinished(book: UserBook) {
+  const cp = getCurrentPage(book);
+  const tp = getTotalPages(book);
+  return book.status === "finished" || (tp > 0 && cp >= tp);
+}
+
+function isToRead(book: UserBook) {
+  return !isFinished(book) && !isReading(book);
+}
 
 const Dashboard = () => {
-  const [apiBooks, setApiBooks] = useState<ApiBook[] | null>(null);
-  const [apiError, setApiError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
-  // ✅ Merr librat nga backend (GET /api/Books) - tash kthen PagedResponse
+  const [books, setBooks] = useState<UserBook[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    let ignore = false;
+    let active = true;
 
     (async () => {
       try {
-        setApiError(null);
-
-        const data = await apiGet<PagedResponse<ApiBook>>("/api/Books", {
-          page: 1,
-          pageSize: 50,
-          sortBy: "title",
-          sortDir: "asc",
-        });
-
-        if (!ignore) {
-          setApiBooks(data.items ?? []);
-        }
-      } catch (err: any) {
-        if (!ignore) {
-          setApiError(err?.message ?? "Unknown API error");
-          setApiBooks(null);
-        }
+        setLoading(true);
+        setError(null);
+        const data = await getMyLibrary();
+        if (active) setBooks(data);
+      } catch (e) {
+        if (active) setError(e instanceof Error ? e.message : "Failed to load dashboard data.");
+      } finally {
+        if (active) setLoading(false);
       }
     })();
 
     return () => {
-      ignore = true;
+      active = false;
     };
   }, []);
 
-  // ✅ Konverto API books → UI books (për me e përdor në UI)
-  const booksForUi: UiBook[] = useMemo(() => {
-    if (apiBooks) {
-      return apiBooks.map((b) => ({
-        id: b.id,
-        title: b.title,
-        author: b.author ?? "Unknown",
-        year: b.year ?? undefined,
-        // këto s’i jep API-ja ende, i vendosim default për demo
-        cover: "https://placehold.co/200x300/png?text=Book",
-        progress: 0,
-        status: "to-read",
-      }));
-    }
+  const metrics = useMemo(() => {
+    const totalBooks = books.length;
+    const readingCount = books.filter(isReading).length;
+    const finishedCount = books.filter(isFinished).length;
+    const toReadCount = books.filter(isToRead).length;
 
-    // fallback në mock data nëse API s’ka data ose failon
-    return mockUserBooks as unknown as UiBook[];
-  }, [apiBooks]);
+    return { totalBooks, readingCount, finishedCount, toReadCount };
+  }, [books]);
 
-  const totalBooks = booksForUi.length;
-  const readingBooks = booksForUi.filter((b) => b.status === "reading");
-  const finishedBooks = booksForUi.filter((b) => b.status === "finished");
-  const toReadBooks = booksForUi.filter((b) => b.status === "to-read");
+  const currentlyReadingBooks = useMemo(() => {
+    return books
+      .filter(isReading)
+      .sort((a, b) => {
+        const aTime = Date.parse(a.lastUpdated ?? "");
+        const bTime = Date.parse(b.lastUpdated ?? "");
 
-  const activityData = [
-    { name: "Mon", books: 2 },
-    { name: "Tue", books: 3 },
-    { name: "Wed", books: 1 },
-    { name: "Thu", books: 4 },
-    { name: "Fri", books: 2 },
-    { name: "Sat", books: 5 },
-    { name: "Sun", books: 3 },
-  ];
+        if (!Number.isNaN(aTime) && !Number.isNaN(bTime)) return bTime - aTime;
+        if (!Number.isNaN(aTime)) return -1;
+        if (!Number.isNaN(bTime)) return 1;
 
-  const pieData = [
-    {
-      name: "Reading",
-      value: readingBooks.length,
-      color: "hsl(var(--status-reading))",
-    },
-    {
-      name: "Finished",
-      value: finishedBooks.length,
-      color: "hsl(var(--status-finished))",
-    },
-    {
-      name: "To Read",
-      value: toReadBooks.length,
-      color: "hsl(var(--status-toread))",
-    },
-  ];
+        return getPercent(b) - getPercent(a);
+      });
+  }, [books]);
+
+  const activityData = useMemo(() => {
+    const now = new Date();
+    const result = Array.from({ length: 7 }, (_, idx) => {
+      const d = new Date(now);
+      d.setDate(now.getDate() - (6 - idx));
+      return {
+        name: DAYS[d.getDay()],
+        key: d.toISOString().slice(0, 10),
+        updates: 0,
+      };
+    });
+
+    books.forEach((book) => {
+      const raw = book.lastUpdated;
+      if (!raw) return;
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return;
+      const dayKey = d.toISOString().slice(0, 10);
+      const bucket = result.find((x) => x.key === dayKey);
+      if (bucket) bucket.updates += 1;
+    });
+
+    return result.map(({ name, updates }) => ({ name, updates }));
+  }, [books]);
+
+  const pieData = useMemo(
+    () => [
+      {
+        name: "Reading",
+        value: metrics.readingCount,
+        color: "hsl(var(--status-reading))",
+      },
+      {
+        name: "Finished",
+        value: metrics.finishedCount,
+        color: "hsl(var(--status-finished))",
+      },
+      {
+        name: "To Read",
+        value: metrics.toReadCount,
+        color: "hsl(var(--status-toread))",
+      },
+    ],
+    [metrics]
+  );
 
   const stats = [
     {
       label: "Total Books",
-      value: totalBooks,
+      value: metrics.totalBooks,
       icon: BookOpen,
       color: "text-primary",
     },
     {
       label: "Currently Reading",
-      value: readingBooks.length,
+      value: metrics.readingCount,
       icon: BookMarked,
       color: "text-status-reading",
     },
     {
       label: "Finished",
-      value: finishedBooks.length,
+      value: metrics.finishedCount,
       icon: CheckCircle,
       color: "text-status-finished",
     },
     {
       label: "To Read",
-      value: toReadBooks.length,
+      value: metrics.toReadCount,
       icon: Clock,
       color: "text-status-toread",
     },
   ];
 
-  const isFetchError = apiError?.toLowerCase().includes("failed to fetch");
-
   return (
     <div className="min-h-screen py-8">
-      <div className="container mx-auto px-4">
+      <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -181,26 +199,15 @@ const Dashboard = () => {
           <p className="text-muted-foreground">
             Track your reading progress and insights
           </p>
-
-          {/* ✅ status i thjeshtë për API */}
-          <div className="mt-3 text-sm">
-            {apiError && !isFetchError ? (
-              <span className="text-destructive">API error: {apiError}</span>
-            ) : apiBooks ? (
-              <span className="text-muted-foreground">
-                Loaded {apiBooks.length} books from API.
-              </span>
-            ) : apiError && isFetchError ? (
-              <span className="text-muted-foreground">
-                API unavailable. Using mock data.
-              </span>
-            ) : (
-              <span className="text-muted-foreground">
-                Loading books from API...
-              </span>
-            )}
-          </div>
         </motion.div>
+
+        {loading && (
+          <p className="text-sm text-muted-foreground mb-6">Loading dashboard data...</p>
+        )}
+
+        {error && (
+          <p className="text-sm text-destructive mb-6">{error}</p>
+        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -215,12 +222,8 @@ const Dashboard = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">
-                        {stat.label}
-                      </p>
-                      <p className="text-3xl font-bold text-foreground mt-1">
-                        {stat.value}
-                      </p>
+                      <p className="text-sm text-muted-foreground">{stat.label}</p>
+                      <p className="text-3xl font-bold text-foreground mt-1">{stat.value}</p>
                     </div>
                     <stat.icon className={`w-8 h-8 ${stat.color}`} />
                   </div>
@@ -248,34 +251,14 @@ const Dashboard = () => {
                 <ResponsiveContainer width="100%" height={250}>
                   <AreaChart data={activityData}>
                     <defs>
-                      <linearGradient
-                        id="colorBooks"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="hsl(var(--primary))"
-                          stopOpacity={0.3}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="hsl(var(--primary))"
-                          stopOpacity={0}
-                        />
+                      <linearGradient id="colorUpdates" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="hsl(var(--border))"
-                    />
-                    <XAxis
-                      dataKey="name"
-                      stroke="hsl(var(--muted-foreground))"
-                    />
-                    <YAxis stroke="hsl(var(--muted-foreground))" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis stroke="hsl(var(--muted-foreground))" allowDecimals={false} />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
@@ -285,10 +268,10 @@ const Dashboard = () => {
                     />
                     <Area
                       type="monotone"
-                      dataKey="books"
+                      dataKey="updates"
                       stroke="hsl(var(--primary))"
                       fillOpacity={1}
-                      fill="url(#colorBooks)"
+                      fill="url(#colorUpdates)"
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -334,12 +317,9 @@ const Dashboard = () => {
                 <div className="flex justify-center gap-6 mt-4">
                   {pieData.map((item) => (
                     <div key={item.name} className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: item.color }}
-                      />
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
                       <span className="text-sm text-muted-foreground">
-                        {item.name}
+                        {item.name}: {item.value}
                       </span>
                     </div>
                   ))}
@@ -361,40 +341,43 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {readingBooks.length === 0 ? (
+                {currentlyReadingBooks.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     No books currently marked as reading.
                   </p>
                 ) : (
-                  readingBooks.map((book) => (
-                    <div key={book.id} className="flex items-center gap-4">
-                      <img
-                        src={
-                          book.cover ??
-                          "https://placehold.co/200x300/png?text=Book"
-                        }
-                        alt={book.title}
-                        className="w-12 h-16 object-cover rounded"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-foreground line-clamp-1">
-                          {book.title}
-                        </h4>
-                        <p className="text-sm text-muted-foreground">
-                          {book.author}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Progress
-                            value={book.progress ?? 0}
-                            className="h-1.5 flex-1"
-                          />
-                          <span className="text-xs text-muted-foreground">
-                            {book.progress ?? 0}%
-                          </span>
+                  currentlyReadingBooks.map((book) => {
+                    const cp = getCurrentPage(book);
+                    const tp = getTotalPages(book);
+                    const percent = getPercent(book);
+
+                    return (
+                      <div key={book.id} className="flex items-center gap-4">
+                        <img
+                          src={book.coverImageUrl || book.cover || "https://placehold.co/200x300/png?text=Book"}
+                          alt={book.title}
+                          className="w-12 h-16 object-cover rounded"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-foreground line-clamp-1">{book.title}</h4>
+                          <p className="text-sm text-muted-foreground">{book.author}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Page {cp} of {tp || "?"}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Progress value={percent} className="h-1.5 flex-1" />
+                            <span className="text-xs text-muted-foreground">{percent}%</span>
+                          </div>
                         </div>
+                        <Button
+                          size="sm"
+                          onClick={() => navigate(`/books/${book.id}/read`)}
+                        >
+                          Continue reading
+                        </Button>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </CardContent>

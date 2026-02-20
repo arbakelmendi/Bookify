@@ -25,6 +25,11 @@ export interface Book {
 export interface UserBook extends Book {
   status: ReadingStatus;
   progress: number;
+  currentPage?: number;
+  pagesRead?: number;
+  totalPages?: number;
+  percent?: number;
+  lastUpdated?: string;
   userRating?: number;
   dateAdded: string;
 }

@@ -14,8 +14,6 @@ public class ReadingService
         _context = context;
     }
 
-    /* ================= Helpers ================= */
-
     private static ReadingDto ToDto(UserBook ub) =>
         new(
             ub.Id,
@@ -26,6 +24,18 @@ public class ReadingService
             ub.PagesRead,
             ub.Percent,
             ub.StartedAt,
+            ub.LastUpdated
+        );
+
+    private static PdfProgressViewDto ToPdfProgressDto(UserBook ub) =>
+        new(
+            ub.BookId,
+            ub.Id,
+            ub.CurrentPage,
+            ub.TotalPages,
+            ub.PagesRead,
+            ub.Percent,
+            ub.Status,
             ub.LastUpdated
         );
 
@@ -45,14 +55,34 @@ public class ReadingService
     {
         if (totalPages <= 0) return 0;
         var p = (double)pagesRead / totalPages * 100.0;
-        if (p < 0) p = 0;
-        if (p > 100) p = 100;
-        return Math.Round(p, 2);
+        p = Math.Clamp(p, 0, 100);
+        return Math.Round(p, 0);
     }
 
-    /* ================= GET Endpoints ================= */
+    private static string NormalizeStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status)) return "Reading";
 
-    // "My reading list" (krejt tracking)
+        var s = status.Trim().ToLowerInvariant();
+        return s switch
+        {
+            "reading" => "Reading",
+            "finished" => "Finished",
+            "planned" => "Planned",
+            "toread" => "ToRead",
+            "to-read" => "ToRead",
+            _ => "Reading"
+        };
+    }
+
+    private static int ClampCurrentPage(int value, int totalPages)
+    {
+        if (totalPages <= 0) return 1;
+        if (value < 1) return 1;
+        if (value > totalPages) return totalPages;
+        return value;
+    }
+
     public async Task<List<ReadingDto>> GetAllAsync(int userId)
     {
         var list = await _context.UserBooks
@@ -71,18 +101,16 @@ public class ReadingService
         return ub == null ? null : ToDto(ub);
     }
 
-    // "Currently reading"
     public async Task<List<ReadingDto>> GetCurrentAsync(int userId)
     {
         var list = await _context.UserBooks
-            .Where(ub => ub.UserId == userId && ub.Status == "Reading")
+            .Where(ub => ub.UserId == userId && (ub.Status == "Reading" || ub.PagesRead > 0 || ub.CurrentPage > 1))
             .OrderByDescending(ub => ub.LastUpdated)
             .ToListAsync();
 
         return list.Select(ToDto).ToList();
     }
 
-    // "Finished"
     public async Task<List<ReadingDto>> GetFinishedAsync(int userId)
     {
         var list = await _context.UserBooks
@@ -93,58 +121,137 @@ public class ReadingService
         return list.Select(ToDto).ToList();
     }
 
-    /* ================= START / PROGRESS / FINISH ================= */
-
-    // Start reading (one per user+book, prevent duplicates)
-    public async Task<ReadingDto> StartAsync(int userId, StartReadingDto dto)
-{
-    if (dto.TotalPages <= 0)
-        throw new ArgumentException("TotalPages must be > 0");
-
-    // gjeje nëse ekziston UserBook për këtë user+book
-    var ub = await _context.UserBooks
-        .FirstOrDefaultAsync(x => x.UserId == userId && x.BookId == dto.BookId);
-
-    // ✅ nëse s’ekziston, krijoje
-    if (ub == null)
+    public async Task<PdfProgressViewDto?> GetPdfProgressAsync(int userId, int bookId)
     {
-        ub = new UserBook
-        {
-            UserId = userId,
-            BookId = dto.BookId,
-            Status = "Reading",
-            TotalPages = dto.TotalPages,
-            PagesRead = 0,
-            Percent = 0,
-            StartedAt = DateTime.UtcNow,
-            LastUpdated = DateTime.UtcNow
-        };
+        var ub = await _context.UserBooks
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.UserId == userId && x.BookId == bookId);
 
-        _context.UserBooks.Add(ub);
+        return ub == null ? null : ToPdfProgressDto(ub);
+    }
+
+    public async Task<(bool created, PdfProgressViewDto? dto, bool missingTotalPages)> UpsertPdfProgressAsync(
+        int userId,
+        int bookId,
+        UpdatePdfProgressDto dto)
+    {
+        var ub = await _context.UserBooks
+            .FirstOrDefaultAsync(x => x.UserId == userId && x.BookId == bookId);
+
+        var now = DateTime.UtcNow;
+        var normalizedStatus = NormalizeStatus(dto.Status);
+
+        if (ub == null)
+        {
+            if (!dto.TotalPages.HasValue || dto.TotalPages.Value <= 0)
+            {
+                return (false, null, true);
+            }
+
+            var totalPages = dto.TotalPages.Value;
+            var currentPage = ClampCurrentPage(dto.CurrentPage, totalPages);
+
+            ub = new UserBook
+            {
+                UserId = userId,
+                BookId = bookId,
+                Status = currentPage <= 1 ? "ToRead" : "Reading",
+                TotalPages = totalPages,
+                CurrentPage = currentPage,
+                PagesRead = currentPage,
+                Percent = CalcPercent(currentPage, totalPages),
+                StartedAt = now,
+                LastUpdated = now
+            };
+
+            _context.UserBooks.Add(ub);
+            await _context.SaveChangesAsync();
+            return (true, ToPdfProgressDto(ub), false);
+        }
+
+        if (dto.TotalPages.HasValue && dto.TotalPages.Value > 0)
+        {
+            ub.TotalPages = dto.TotalPages.Value;
+        }
+
+        if (ub.TotalPages <= 0)
+        {
+            return (false, null, true);
+        }
+
+        ub.CurrentPage = ub.TotalPages > 0
+            ? ClampCurrentPage(dto.CurrentPage, ub.TotalPages)
+            : Math.Max(dto.CurrentPage, 1);
+        ub.PagesRead = ub.TotalPages > 0
+            ? Math.Clamp(ub.CurrentPage, 0, ub.TotalPages)
+            : ub.CurrentPage;
+        ub.Percent = ub.TotalPages > 0 ? CalcPercent(ub.PagesRead, ub.TotalPages) : 0;
+        ub.LastUpdated = now;
+
+        if (ub.CurrentPage >= ub.TotalPages && ub.TotalPages > 0)
+        {
+            ub.Status = "Finished";
+        }
+        else if (ub.CurrentPage > 1 && (ub.TotalPages <= 0 || ub.CurrentPage < ub.TotalPages))
+        {
+            ub.Status = "Reading";
+        }
+        else if (ub.CurrentPage <= 1 && string.IsNullOrWhiteSpace(dto.Status))
+        {
+            ub.Status = "ToRead";
+        }
+        else if (!string.IsNullOrWhiteSpace(dto.Status))
+        {
+            ub.Status = normalizedStatus;
+        }
+
+        await _context.SaveChangesAsync();
+        return (false, ToPdfProgressDto(ub), false);
+    }
+
+    public async Task<ReadingDto> StartAsync(int userId, StartReadingDto dto)
+    {
+        if (dto.TotalPages <= 0)
+            throw new ArgumentException("TotalPages must be > 0");
+
+        var ub = await _context.UserBooks
+            .FirstOrDefaultAsync(x => x.UserId == userId && x.BookId == dto.BookId);
+
+        if (ub == null)
+        {
+            ub = new UserBook
+            {
+                UserId = userId,
+                BookId = dto.BookId,
+                Status = "Reading",
+                TotalPages = dto.TotalPages,
+                CurrentPage = 1,
+                PagesRead = 0,
+                Percent = 0,
+                StartedAt = DateTime.UtcNow,
+                LastUpdated = DateTime.UtcNow
+            };
+
+            _context.UserBooks.Add(ub);
+            await _context.SaveChangesAsync();
+            return ToDto(ub);
+        }
+
+        if (ub.TotalPages <= 0)
+            ub.TotalPages = dto.TotalPages;
+
+        if (ub.Status == "Finished")
+            throw new InvalidOperationException("This book is already finished.");
+
+        ub.Status = "Reading";
+        ub.StartedAt = ub.StartedAt == default ? DateTime.UtcNow : ub.StartedAt;
+        ub.LastUpdated = DateTime.UtcNow;
+        ub.CurrentPage = ub.CurrentPage < 1 ? 1 : ub.CurrentPage;
+
         await _context.SaveChangesAsync();
         return ToDto(ub);
     }
 
-    // ✅ nëse ekziston (p.sh. "to-read"), mos e kthe error — veç nis leximin
-    if (ub.TotalPages <= 0)
-        ub.TotalPages = dto.TotalPages;
-
-    // nëse është Finished, mundesh me vendos rregull:
-    // - ose mos lejo restart
-    // - ose lejo restart duke resetu pagesRead
-    if (ub.Status == "Finished")
-        throw new InvalidOperationException("This book is already finished.");
-
-    ub.Status = "Reading";
-    ub.StartedAt = ub.StartedAt == default ? DateTime.UtcNow : ub.StartedAt;
-    ub.LastUpdated = DateTime.UtcNow;
-
-    await _context.SaveChangesAsync();
-    return ToDto(ub);
-}
-
-
-    // Update progress: pages read / percent / lastUpdated
     public async Task<bool> UpdateProgressAsync(int id, int userId, UpdateProgressDto dto)
     {
         var ub = await _context.UserBooks
@@ -155,10 +262,10 @@ public class ReadingService
         ValidateProgress(ub, dto.PagesRead);
 
         ub.PagesRead = dto.PagesRead;
+        ub.CurrentPage = ub.TotalPages > 0 ? Math.Clamp(Math.Max(1, dto.PagesRead), 1, ub.TotalPages) : 1;
         ub.Percent = CalcPercent(ub.PagesRead, ub.TotalPages);
         ub.LastUpdated = DateTime.UtcNow;
 
-        // auto mark finished when 100% or pages==total
         if (ub.PagesRead == ub.TotalPages || ub.Percent >= 100)
             ub.Status = "Finished";
         else
@@ -168,7 +275,6 @@ public class ReadingService
         return true;
     }
 
-    // Mark as finished
     public async Task<bool> MarkFinishedAsync(int id, int userId)
     {
         var ub = await _context.UserBooks
@@ -179,6 +285,7 @@ public class ReadingService
         if (ub.TotalPages <= 0)
             throw new ArgumentException("TotalPages must be > 0");
 
+        ub.CurrentPage = ub.TotalPages;
         ub.PagesRead = ub.TotalPages;
         ub.Percent = 100;
         ub.Status = "Finished";
@@ -188,9 +295,6 @@ public class ReadingService
         return true;
     }
 
-    /* ================= OPTIONAL: keep your old CRUD ================= */
-
-    // Keep UpdateAsync for status if you still need it (optional)
     public async Task<bool> UpdateAsync(int id, int userId, UpdateReadingDto dto)
     {
         var ub = await _context.UserBooks
@@ -201,9 +305,9 @@ public class ReadingService
         ub.Status = dto.Status;
         ub.LastUpdated = DateTime.UtcNow;
 
-        // if manually set finished, enforce 100%
         if (ub.Status == "Finished" && ub.TotalPages > 0)
         {
+            ub.CurrentPage = ub.TotalPages;
             ub.PagesRead = ub.TotalPages;
             ub.Percent = 100;
         }

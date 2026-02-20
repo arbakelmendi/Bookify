@@ -12,6 +12,40 @@ export type ReadingEntry = {
   lastUpdated: string;
 };
 
+export type PdfProgressViewDto = {
+  bookId: number;
+  userBookId: number;
+  currentPage: number;
+  totalPages: number;
+  pagesRead: number;
+  percent: number;
+  status: string;
+  lastUpdated: string;
+};
+
+export type UpdatePdfProgressDto = {
+  currentPage: number;
+  totalPages?: number;
+  status?: string;
+};
+
+const BASE_URL = import.meta.env.DEV
+  ? ""
+  : (import.meta.env.VITE_API_BASE_URL ?? "");
+
+function getAuthHeaders(): HeadersInit {
+  const token = localStorage.getItem("bookify_auth_token");
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
 export async function getCurrentReading(): Promise<ReadingEntry[]> {
   return apiGet<ReadingEntry[]>("/api/Reading/current");
 }
@@ -40,4 +74,27 @@ export async function updateProgress(
 
 export async function finishReading(id: number): Promise<void> {
   return apiPut<void>(`/api/Reading/${id}/finish`);
+}
+
+export async function getPdfProgress(bookId: number): Promise<PdfProgressViewDto | null> {
+  const response = await fetch(`${BASE_URL}/api/Reading/book/${bookId}/progress`, {
+    method: "GET",
+    headers: getAuthHeaders(),
+  });
+
+  if (response.status === 404) return null;
+
+  if (!response.ok) {
+    const message = (await response.text()).trim() || "Failed to load PDF progress.";
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+export async function upsertPdfProgress(
+  bookId: number,
+  body: UpdatePdfProgressDto
+): Promise<PdfProgressViewDto | void> {
+  return apiPut<PdfProgressViewDto | void>(`/api/Reading/book/${bookId}/progress`, body);
 }

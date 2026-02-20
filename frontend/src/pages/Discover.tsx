@@ -52,7 +52,7 @@ const Discover = () => {
     <div className="min-h-screen">
       <HeroSection />
 
-      <div className="container mx-auto px-4 py-8 space-y-12">
+      <div className="mx-auto max-w-7xl px-6 lg:px-8 py-8 space-y-12">
         {loading && <p className="text-muted-foreground">Loading books...</p>}
         {error && <p className="text-destructive">{error}</p>}
 
