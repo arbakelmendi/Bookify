@@ -2,6 +2,7 @@ import { api } from "@/lib/api";
 
 export const friendsApi = {
   incoming: () => api.get("/api/Friends/incoming").then(r => r.data),
+  incomingCount: () => api.get("/api/Friends/requests/incoming/count").then(r => r.data as { count: number }),
   outgoing: () => api.get("/api/Friends/outgoing").then(r => r.data),
   list: () => api.get("/api/Friends/list").then(r => r.data),
 

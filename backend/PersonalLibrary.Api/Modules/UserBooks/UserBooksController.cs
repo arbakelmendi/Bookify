@@ -152,7 +152,42 @@ public class UserBooksController : ControllerBase
 
         if (ub == null) return NotFound("Book is not in your library.");
 
-        ub.Status = dto.Status;
+        var requested = (dto.Status ?? string.Empty).Trim().ToLowerInvariant();
+
+        if (requested is "completed" or "finished")
+        {
+            ub.Status = "Finished";
+            if (ub.TotalPages > 0)
+            {
+                ub.CurrentPage = ub.TotalPages;
+                ub.PagesRead = ub.TotalPages;
+                ub.Percent = 100;
+            }
+            else
+            {
+                // If total pages are unknown, keep status authoritative.
+                ub.Percent = 100;
+            }
+        }
+        else if (requested is "planned" or "to-read" or "toread" or "to read")
+        {
+            ub.Status = "To Read";
+            ub.CurrentPage = 1;
+            ub.PagesRead = 0;
+            ub.Percent = 0;
+        }
+        else
+        {
+            ub.Status = "Reading";
+            if (ub.TotalPages > 0)
+            {
+                ub.CurrentPage = Math.Clamp(ub.CurrentPage, 1, ub.TotalPages);
+                ub.PagesRead = Math.Clamp(ub.CurrentPage, 0, ub.TotalPages);
+                ub.Percent = (ub.PagesRead * 100.0) / ub.TotalPages;
+            }
+        }
+
+        ub.LastUpdated = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
         return NoContent();

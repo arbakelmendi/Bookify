@@ -80,6 +80,7 @@ const Friends = () => {
       setActionLoadingId(id);
       await fn();
       await loadAll();
+      window.dispatchEvent(new Event("friends:incoming-count-refresh"));
     } catch (e: any) {
       setErr(e?.response?.data?.message ?? "Action failed.");
     } finally {

@@ -23,11 +23,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import { getInboxRecommendations } from "@/api/recommendations";
+import { friendsApi } from "@/api/friends";
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [giftCount, setGiftCount] = useState<number>(0);
+  const [friendRequestCount, setFriendRequestCount] = useState<number>(0);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -59,6 +61,7 @@ export const Navbar = () => {
   useEffect(() => {
     if (!isAuthenticated) {
       setGiftCount(0);
+      setFriendRequestCount(0);
       return;
     }
 
@@ -66,19 +69,29 @@ export const Navbar = () => {
 
     const load = async () => {
       try {
-        const inbox = await getInboxRecommendations();
+        const [inbox, incomingCount] = await Promise.all([
+          getInboxRecommendations(),
+          friendsApi.incomingCount(),
+        ]);
         if (!active) return;
         setGiftCount(Array.isArray(inbox) ? inbox.length : 0);
+        setFriendRequestCount(Number(incomingCount?.count ?? 0));
       } catch {
         if (!active) return;
         setGiftCount(0);
+        setFriendRequestCount(0);
       }
     };
 
     load();
+    const onFriendRefresh = () => {
+      void load();
+    };
+    window.addEventListener("friends:incoming-count-refresh", onFriendRefresh);
     const t = window.setInterval(load, 15000); // refresh every 15s
     return () => {
       active = false;
+      window.removeEventListener("friends:incoming-count-refresh", onFriendRefresh);
       window.clearInterval(t);
     };
   }, [isAuthenticated]);
@@ -122,6 +135,7 @@ export const Navbar = () => {
             {navLinks.map((link) => {
               const isActive = location.pathname === link.path;
               const isGifts = link.path === "/gifts";
+              const isFriends = link.path === "/friends";
 
               return (
                 <Link
@@ -141,6 +155,11 @@ export const Navbar = () => {
                     {isGifts && isAuthenticated && giftCount > 0 && (
                       <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] leading-none">
                         {giftCount > 99 ? "99+" : giftCount}
+                      </span>
+                    )}
+                    {isFriends && isAuthenticated && friendRequestCount > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] leading-none">
+                        {friendRequestCount > 99 ? "99+" : friendRequestCount}
                       </span>
                     )}
                   </span>
@@ -266,6 +285,7 @@ export const Navbar = () => {
               {navLinks.map((link) => {
                 const isActive = location.pathname === link.path;
                 const isGifts = link.path === "/gifts";
+                const isFriends = link.path === "/friends";
 
                 return (
                   <Link
@@ -284,6 +304,11 @@ export const Navbar = () => {
                     {isGifts && isAuthenticated && giftCount > 0 && (
                       <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] leading-none">
                         {giftCount > 99 ? "99+" : giftCount}
+                      </span>
+                    )}
+                    {isFriends && isAuthenticated && friendRequestCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] leading-none">
+                        {friendRequestCount > 99 ? "99+" : friendRequestCount}
                       </span>
                     )}
                   </Link>

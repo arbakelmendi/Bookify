@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -9,32 +9,43 @@ import { getMyLibrary, removeFromLibrary, updateLibraryStatus } from "@/api/user
 import { useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
-
-function normalizeStatus(s?: string) {
-  const v = (s ?? "").trim();
-
-  // ToRead / Finished / Reading -> to-read / finished / reading
-  const camelToKebab = v.replace(/([a-z0-9])([A-Z])/g, "$1-$2");
-
-  return camelToKebab.toLowerCase().replace(/\s|_/g, "-");
+function normalizeStatus(raw?: unknown) {
+  return String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s|_/g, "-");
 }
 
-
 const Library = () => {
-  const [searchParams, setSearchParams] = useSearchParams(); // ✅ DUHET BRENDA
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [books, setBooks] = useState<UserBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<ReadingStatus | "all">("all");
   const { toast } = useToast();
+  const searchQuery = searchParams.get("q") ?? "";
+
+  const parsedFilter = normalizeStatus(searchParams.get("filter") || "all");
+  const activeFilter: ReadingStatus | "all" =
+    parsedFilter === "reading" ||
+    parsedFilter === "to-read" ||
+    parsedFilter === "finished" ||
+    parsedFilter === "all"
+      ? (parsedFilter as ReadingStatus | "all")
+      : "all";
 
   const load = async (activeRef?: { current: boolean }) => {
     try {
       setError(null);
       const data = await getMyLibrary();
-      if (!activeRef || activeRef.current) setBooks(data);
+      if (!activeRef || activeRef.current) {
+        setBooks(data);
+        console.log("LIBRARY RAW", (data ?? []).slice(0, 5));
+        console.log(
+          "STATUSES",
+          (data ?? []).map((x: any) => x?.status ?? x?.readingStatus ?? x?.reading_status)
+        );
+      }
     } catch (e) {
       if (!activeRef || activeRef.current) {
         setError(e instanceof Error ? e.message : "Failed to load library.");
@@ -44,7 +55,6 @@ const Library = () => {
     }
   };
 
-  // ✅ load data
   useEffect(() => {
     const active = { current: true };
     load(active);
@@ -53,14 +63,6 @@ const Library = () => {
     };
   }, []);
 
-  // ✅ read filter from URL (?filter=to-read)
-  useEffect(() => {
-    const f = normalizeStatus(searchParams.get("filter") ?? "");
-    if (f === "reading" || f === "to-read" || f === "finished" || f === "all") {
-      setActiveFilter(f as any);
-    }
-  }, [searchParams]);
-
   const filters: { label: string; value: ReadingStatus | "all" }[] = [
     { label: "All Books", value: "all" },
     { label: "Reading", value: "reading" },
@@ -68,17 +70,74 @@ const Library = () => {
     { label: "Finished", value: "finished" },
   ];
 
-  const filteredBooks = books.filter((book) => {
-    const matchesSearch =
-      book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      book.author.toLowerCase().includes(searchQuery.toLowerCase());
+  const updateParams = (patch: Record<string, string | null | undefined>) => {
+    setSearchParams(
+      (prev) => {
+        const sp = new URLSearchParams(prev);
+        Object.entries(patch).forEach(([key, value]) => {
+          if (!value || value === "all") sp.delete(key);
+          else sp.set(key, String(value));
+        });
+        return sp;
+      },
+      { replace: true }
+    );
+  };
 
-    const matchesFilter =
-      activeFilter === "all" ||
-      normalizeStatus(book.status) === normalizeStatus(activeFilter);
+  useEffect(() => {
+    console.log("FILTER URL", searchParams.toString(), "activeFilter", activeFilter);
+  }, [searchParams, activeFilter]);
 
-    return matchesSearch && matchesFilter;
-  });
+  const normalizedItems = useMemo(() => {
+    return books.map((x: any) => {
+      const statusRaw =
+        x?.status ?? x?.readingStatus ?? x?.reading_status ?? x?.reading_state ?? "";
+      const status = normalizeStatus(statusRaw);
+
+      const totalPages = Number(x?.totalPages ?? x?.total_pages ?? x?.pages ?? 0) || 0;
+      const currentPage = Number(x?.currentPage ?? x?.current_page ?? x?.page ?? 0) || 0;
+
+      const isFinished = status === "finished" || (totalPages > 0 && currentPage >= totalPages);
+      const isToRead = status === "to-read" || status === "toread" || (!isFinished && currentPage <= 1);
+      const isReading = status === "reading" || (!isFinished && currentPage > 1);
+
+      return {
+        ...x,
+        _status: status,
+        _isFinished: isFinished,
+        _isToRead: isToRead,
+        _isReading: isReading,
+        _totalPages: totalPages,
+        _currentPage: currentPage,
+      } as UserBook & {
+        _status: string;
+        _isFinished: boolean;
+        _isToRead: boolean;
+        _isReading: boolean;
+        _totalPages: number;
+        _currentPage: number;
+      };
+    });
+  }, [books]);
+
+  const filteredItems = useMemo(() => {
+    return normalizedItems.filter((book) => {
+      const matchesSearch =
+        book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        book.author.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesFilter =
+        activeFilter === "all"
+          ? true
+          : activeFilter === "finished"
+          ? book._isFinished
+          : activeFilter === "to-read"
+          ? book._isToRead
+          : book._isReading;
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [activeFilter, normalizedItems, searchQuery]);
 
   const handleStatusChange = async (id: string, status: ReadingStatus) => {
     setBooks((prev) =>
@@ -87,6 +146,26 @@ const Library = () => {
           ? {
               ...book,
               status,
+              currentPage:
+                status === "finished"
+                  ? Math.max(1, book.totalPages ?? 1)
+                  : status === "to-read"
+                  ? 1
+                  : Math.max(2, book.currentPage ?? 2),
+              pagesRead:
+                status === "finished"
+                  ? Math.max(1, book.totalPages ?? 1)
+                  : status === "to-read"
+                  ? 0
+                  : Math.max(2, book.pagesRead ?? 2),
+              percent:
+                status === "finished"
+                  ? 100
+                  : status === "to-read"
+                  ? 0
+                  : book.totalPages && book.totalPages > 0
+                  ? Math.min(99, Math.round((Math.max(2, book.currentPage ?? 2) * 100) / book.totalPages))
+                  : book.percent,
               progress: status === "finished" ? 100 : status === "to-read" ? 0 : book.progress,
             }
           : book
@@ -141,7 +220,7 @@ const Library = () => {
               type="text"
               placeholder="Search your library..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => updateParams({ q: e.target.value })}
               className="pl-10"
             />
           </div>
@@ -152,11 +231,12 @@ const Library = () => {
                 key={filter.value}
                 variant={activeFilter === filter.value ? "default" : "outline"}
                 size="sm"
-                onClick={() => {
-                  setActiveFilter(filter.value);
-
-                  if (filter.value === "all") setSearchParams({});
-                  else setSearchParams({ filter: filter.value });
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log("TAB CLICK", filter.value);
+                  updateParams({ filter: filter.value });
                 }}
                 className="flex-shrink-0"
               >
@@ -166,10 +246,15 @@ const Library = () => {
           </div>
         </motion.div>
 
+        <div className="text-xs opacity-60 mb-3">
+          URL: {window.location.search || "(none)"} | filter={activeFilter} | shown=
+          {filteredItems.length}/{normalizedItems.length}
+        </div>
+
         {error && <p className="text-destructive mb-4">{error}</p>}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
-          {filteredBooks.map((book, index) => (
+          {filteredItems.map((book, index) => (
             <LibraryCard
               key={book.id}
               book={book}
@@ -180,7 +265,7 @@ const Library = () => {
           ))}
         </div>
 
-        {filteredBooks.length === 0 && (
+        {filteredItems.length === 0 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
             <p className="text-muted-foreground">No books found</p>
           </motion.div>

@@ -24,6 +24,13 @@ public class FriendService
         _notifications = notifications;
     }
 
+    public Task<int> GetIncomingPendingCountAsync(int userId)
+    {
+        return _context.FriendRequests
+            .AsNoTracking()
+            .CountAsync(fr => fr.ReceiverId == userId && fr.Status == FriendRequestStatuses.Pending);
+    }
+
     // ✅ Pending incoming requests (that others sent to me)
     public async Task<List<FriendRequestViewDto>> GetIncomingAsync(int userId)
     {

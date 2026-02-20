@@ -26,6 +26,15 @@ public class FriendsController : ControllerBase
         return Ok(data);
     }
 
+    // GET: /api/Friends/requests/incoming/count
+    [HttpGet("requests/incoming/count")]
+    public async Task<IActionResult> IncomingCount()
+    {
+        var userId = GetUserId();
+        var count = await _service.GetIncomingPendingCountAsync(userId);
+        return Ok(new { count });
+    }
+
     // GET: /api/Friends/outgoing (Pending only)
     [HttpGet("outgoing")]
     public async Task<IActionResult> Outgoing()

@@ -78,12 +78,19 @@ export function mapApiUserBookToUserBook(x: ApiUserBookMaybeNested): UserBook {
   const totalPages = Math.max(0, x.totalPages ?? 0);
   const computedPercent = totalPages > 0 ? (currentPage * 100) / totalPages : 0;
   const percent = Math.max(0, Math.min(100, x.percent ?? computedPercent));
+  const statusFromApi = apiStatusToUi(x.status);
   const resolvedStatus: UserBook["status"] =
-    totalPages > 0 && currentPage >= totalPages
+    statusFromApi === "finished"
       ? "finished"
-      : currentPage > 1
-        ? "reading"
-        : apiStatusToUi(x.status);
+      : totalPages > 0 && currentPage >= totalPages
+        ? "finished"
+        : statusFromApi === "to-read"
+          ? "to-read"
+          : statusFromApi === "reading"
+            ? "reading"
+            : currentPage > 1
+              ? "reading"
+              : "to-read";
 
   return {
     ...base,
