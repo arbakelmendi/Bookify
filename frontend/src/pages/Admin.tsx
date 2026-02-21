@@ -155,6 +155,15 @@ type BookFormState = {
   previewUrl: string;
 };
 
+type AdminActivityPoint = {
+  date: string;
+  label: string;
+  activeUsers: number;
+  reviewEvents: number;
+  readingEvents: number;
+  totalEvents: number;
+};
+
 const emptyBookForm = (): BookFormState => ({
   title: "",
   author: "",
@@ -209,6 +218,13 @@ const Admin = () => {
   // REVIEWS
   const [reviews, setReviews] = useState<AdminReviewDto[]>([]);
   const [analyticsReviews, setAnalyticsReviews] = useState<AdminReviewDto[]>([]);
+  const [analyticsActivity, setAnalyticsActivity] = useState<AdminActivityPoint[]>([]);
+  const [analyticsTotals, setAnalyticsTotals] = useState({
+    activeUsers: 0,
+    reviewEvents: 0,
+    readingEvents: 0,
+    totalEvents: 0,
+  });
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
   const [reviewSearchInput, setReviewSearchInput] = useState("");
@@ -368,11 +384,44 @@ const Admin = () => {
     }
   };
 
+  const fetchAnalyticsActivity = async () => {
+    try {
+      const data = await apiGet<{
+        items: AdminActivityPoint[];
+        totals?: {
+          activeUsers?: number;
+          reviewEvents?: number;
+          readingEvents?: number;
+          totalEvents?: number;
+        };
+      }>("/api/admin/analytics/activity", { days: 7 });
+
+      const items = Array.isArray(data?.items) ? data.items : [];
+      setAnalyticsActivity(items);
+      setAnalyticsTotals({
+        activeUsers: Number(data?.totals?.activeUsers ?? 0),
+        reviewEvents: Number(data?.totals?.reviewEvents ?? 0),
+        readingEvents: Number(data?.totals?.readingEvents ?? 0),
+        totalEvents: Number(data?.totals?.totalEvents ?? 0),
+      });
+    } catch (error) {
+      console.error("Failed to fetch analytics activity:", error);
+      setAnalyticsActivity([]);
+      setAnalyticsTotals({
+        activeUsers: 0,
+        reviewEvents: 0,
+        readingEvents: 0,
+        totalEvents: 0,
+      });
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchBooks();
     fetchReviews();
     fetchAnalyticsReviews();
+    fetchAnalyticsActivity();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -388,8 +437,17 @@ const Admin = () => {
 
   useEffect(() => {
     fetchAnalyticsReviews();
+    fetchAnalyticsActivity();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewTotalItems]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      fetchAnalyticsActivity();
+    }, 15000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setReviewPage(1);
@@ -885,35 +943,27 @@ useEffect(() => {
   };
 
   const analyticsActivityData = useMemo(() => {
-    const days: { key: string; label: string }[] = [];
+    if (analyticsActivity.length > 0) {
+      return analyticsActivity.map((d) => ({
+        name: d.label,
+        users: d.activeUsers,
+        books: d.totalEvents,
+      }));
+    }
+
+    const fallback: { name: string; users: number; books: number }[] = [];
     const now = new Date();
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now);
-      d.setHours(0, 0, 0, 0);
       d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
-      const label = d.toLocaleDateString(undefined, { weekday: "short" });
-      days.push({ key, label });
+      fallback.push({
+        name: d.toLocaleDateString(undefined, { weekday: "short" }),
+        users: 0,
+        books: 0,
+      });
     }
-
-    const reviewsByDay = new Map<string, AdminReviewDto[]>();
-    for (const r of analyticsReviews) {
-      const key = new Date(r.createdAt).toISOString().slice(0, 10);
-      const list = reviewsByDay.get(key) ?? [];
-      list.push(r);
-      reviewsByDay.set(key, list);
-    }
-
-    return days.map(({ key, label }) => {
-      const list = reviewsByDay.get(key) ?? [];
-      const uniqueUsers = new Set(list.map((r) => r.userId)).size;
-      return {
-        name: label,
-        users: uniqueUsers,
-        books: list.length,
-      };
-    });
-  }, [analyticsReviews]);
+    return fallback;
+  }, [analyticsActivity]);
 
   const analyticsCategoryData = useMemo(() => {
     const bucket = new Map<string, number>();
@@ -927,17 +977,7 @@ useEffect(() => {
       .sort((a, b) => b.value - a.value);
   }, [books]);
 
-  const reviewsLast7d = useMemo(() => {
-    const since = new Date();
-    since.setHours(0, 0, 0, 0);
-    since.setDate(since.getDate() - 6);
-    return analyticsReviews.filter((r) => new Date(r.createdAt) >= since);
-  }, [analyticsReviews]);
-
-  const activeUsersLast7d = useMemo(
-    () => new Set(reviewsLast7d.map((r) => r.userId)).size,
-    [reviewsLast7d]
-  );
+  const activeUsersLast7d = analyticsTotals.activeUsers;
 
   const stats = [
     {
@@ -958,14 +998,14 @@ useEffect(() => {
       title: "Active Users (7d)",
       value: activeUsersLast7d,
       icon: Activity,
-      change: `${reviewsLast7d.length} review events`,
+      change: `${analyticsTotals.totalEvents} total events`,
       changeType: "positive" as const,
     },
     {
       title: "Reviews Total",
       value: analyticsReviews.length,
       icon: Library,
-      change: "Loaded from admin reviews",
+      change: `${analyticsTotals.readingEvents} reading updates`,
       changeType: "positive" as const,
     },
   ];
