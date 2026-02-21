@@ -279,6 +279,9 @@ export const HeroSection = () => {
                 src={coverSrc}
                 alt={featuredBook.title}
                 className="relative w-72 h-96 object-cover rounded-xl shadow-2xl transition-transform duration-300 group-hover:scale-105"
+                onError={(e) => {
+                  e.currentTarget.src = "https://placehold.co/600x900/png?text=Book";
+                }}
               />
               {featuredBook.isAudiobook && (
                 <div className="absolute -bottom-4 -right-4 bg-primary text-primary-foreground p-4 rounded-full shadow-lg">
