@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 
@@ -7,7 +7,6 @@ import {
   Users,
   BookOpen,
   BarChart3,
-  Settings,
   Shield,
   TrendingUp,
   Activity,
@@ -110,24 +109,6 @@ import {
   Cell,
 } from "recharts";
 
-const activityData = [
-  { name: "Mon", users: 12, books: 45 },
-  { name: "Tue", users: 19, books: 52 },
-  { name: "Wed", users: 15, books: 48 },
-  { name: "Thu", users: 25, books: 61 },
-  { name: "Fri", users: 22, books: 55 },
-  { name: "Sat", users: 30, books: 70 },
-  { name: "Sun", users: 28, books: 65 },
-];
-
-const categoryData = [
-  { name: "Fiction", value: 35 },
-  { name: "Sci-Fi", value: 20 },
-  { name: "Fantasy", value: 15 },
-  { name: "Self-Help", value: 18 },
-  { name: "Other", value: 12 },
-];
-
 const COLORS = [
   "hsl(var(--primary))",
   "hsl(var(--chart-2))",
@@ -227,6 +208,7 @@ const Admin = () => {
 
   // REVIEWS
   const [reviews, setReviews] = useState<AdminReviewDto[]>([]);
+  const [analyticsReviews, setAnalyticsReviews] = useState<AdminReviewDto[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
   const [reviewSearchInput, setReviewSearchInput] = useState("");
@@ -296,16 +278,31 @@ const Admin = () => {
       setBooksLoading(true);
       setBooksError(null);
 
-      // supports both: Array<Book> OR { items: Book[] }
-      const data = await apiGet<any>("/api/Books");
+      const pageSize = 50;
+      let page = 1;
+      let totalPages = 1;
+      const all: AdminBook[] = [];
 
-      const list: AdminBook[] = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.items)
-        ? data.items
-        : [];
+      do {
+        const data = await apiGet<any>("/api/Books", {
+          page,
+          pageSize,
+          sortBy: "id",
+          sortDir: "desc",
+        });
 
-      setBooks(list);
+        const list: AdminBook[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.items)
+          ? data.items
+          : [];
+
+        all.push(...list);
+        totalPages = Math.max(1, Number(data?.totalPages ?? 1));
+        page += 1;
+      } while (page <= totalPages && page <= 100);
+
+      setBooks(all);
     } catch (error) {
       console.error("Failed to fetch books:", error);
       setBooksError("Failed to load books.");
@@ -350,10 +347,32 @@ const Admin = () => {
     }
   };
 
+  const fetchAnalyticsReviews = async () => {
+    try {
+      const pageSize = 200;
+      let page = 1;
+      let totalPages = 1;
+      const all: AdminReviewDto[] = [];
+
+      do {
+        const data = await getAdminReviews({ page, pageSize });
+        all.push(...(data.items ?? []));
+        totalPages = Math.max(1, data.totalPages ?? 1);
+        page += 1;
+      } while (page <= totalPages && page <= 10);
+
+      setAnalyticsReviews(all);
+    } catch (error) {
+      console.error("Failed to fetch analytics reviews:", error);
+      setAnalyticsReviews([]);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchBooks();
     fetchReviews();
+    fetchAnalyticsReviews();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -366,6 +385,11 @@ const Admin = () => {
     fetchReviews();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewSearch, reviewUserFilter, reviewBookFilter, reviewRatingFilter, reviewPage, reviewPageSize]);
+
+  useEffect(() => {
+    fetchAnalyticsReviews();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewTotalItems]);
 
   useEffect(() => {
     setReviewPage(1);
@@ -860,33 +884,88 @@ useEffect(() => {
     }
   };
 
+  const analyticsActivityData = useMemo(() => {
+    const days: { key: string; label: string }[] = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      const label = d.toLocaleDateString(undefined, { weekday: "short" });
+      days.push({ key, label });
+    }
+
+    const reviewsByDay = new Map<string, AdminReviewDto[]>();
+    for (const r of analyticsReviews) {
+      const key = new Date(r.createdAt).toISOString().slice(0, 10);
+      const list = reviewsByDay.get(key) ?? [];
+      list.push(r);
+      reviewsByDay.set(key, list);
+    }
+
+    return days.map(({ key, label }) => {
+      const list = reviewsByDay.get(key) ?? [];
+      const uniqueUsers = new Set(list.map((r) => r.userId)).size;
+      return {
+        name: label,
+        users: uniqueUsers,
+        books: list.length,
+      };
+    });
+  }, [analyticsReviews]);
+
+  const analyticsCategoryData = useMemo(() => {
+    const bucket = new Map<string, number>();
+    for (const b of books) {
+      const name = (b.category ?? "").trim() || "Uncategorized";
+      bucket.set(name, (bucket.get(name) ?? 0) + 1);
+    }
+
+    return Array.from(bucket.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [books]);
+
+  const reviewsLast7d = useMemo(() => {
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    since.setDate(since.getDate() - 6);
+    return analyticsReviews.filter((r) => new Date(r.createdAt) >= since);
+  }, [analyticsReviews]);
+
+  const activeUsersLast7d = useMemo(
+    () => new Set(reviewsLast7d.map((r) => r.userId)).size,
+    [reviewsLast7d]
+  );
+
   const stats = [
     {
       title: "Total Users",
       value: users.length,
       icon: Users,
-      change: "+12%",
+      change: `${activeUsersLast7d} active in 7d`,
       changeType: "positive" as const,
     },
     {
       title: "Total Books",
       value: books.length,
       icon: BookOpen,
-      change: "+5%",
+      change: `${analyticsCategoryData.length} categories`,
       changeType: "positive" as const,
     },
     {
-      title: "Active Sessions",
-      value: Math.floor(users.length * 0.7),
+      title: "Active Users (7d)",
+      value: activeUsersLast7d,
       icon: Activity,
-      change: "+8%",
+      change: `${reviewsLast7d.length} review events`,
       changeType: "positive" as const,
     },
     {
-      title: "Library Views",
-      value: "1.2k",
+      title: "Reviews Total",
+      value: analyticsReviews.length,
       icon: Library,
-      change: "+15%",
+      change: "Loaded from admin reviews",
       changeType: "positive" as const,
     },
   ];
@@ -958,7 +1037,6 @@ useEffect(() => {
                         <div className="flex items-center gap-1 mt-2">
                           <TrendingUp className="w-3 h-3 text-green-500" />
                           <span className="text-xs text-green-500">{stat.change}</span>
-                          <span className="text-xs text-muted-foreground">vs last week</span>
                         </div>
                       </div>
                       <div className="p-3 bg-primary/10 rounded-full">
@@ -1105,7 +1183,7 @@ useEffect(() => {
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
-                      <AreaChart data={activityData}>
+                      <AreaChart data={analyticsActivityData}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis dataKey="name" className="text-xs" />
                         <YAxis className="text-xs" />
@@ -1146,7 +1224,7 @@ useEffect(() => {
                     <ResponsiveContainer width="100%" height={300}>
                       <PieChart>
                         <Pie
-                          data={categoryData}
+                          data={analyticsCategoryData}
                           cx="50%"
                           cy="50%"
                           innerRadius={60}
@@ -1154,7 +1232,7 @@ useEffect(() => {
                           paddingAngle={5}
                           dataKey="value"
                         >
-                          {categoryData.map((_, index) => (
+                          {analyticsCategoryData.map((_, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
@@ -1169,7 +1247,7 @@ useEffect(() => {
                     </ResponsiveContainer>
 
                     <div className="flex flex-wrap justify-center gap-4 mt-4">
-                      {categoryData.map((item, index) => (
+                      {analyticsCategoryData.map((item, index) => (
                         <div key={item.name} className="flex items-center gap-2">
                           <div
                             className="w-3 h-3 rounded-full"
@@ -1293,10 +1371,10 @@ useEffect(() => {
                                 )}
                               </TableCell>
 
-                              <TableCell>{book.author || "â"}</TableCell>
+                              <TableCell>{book.author || "â€”"}</TableCell>
 
                               <TableCell>
-                                <Badge variant="outline">{book.category || "â"}</Badge>
+                                <Badge variant="outline">{book.category || "â€”"}</Badge>
                               </TableCell>
 
                                                             <TableCell>
@@ -1308,7 +1386,7 @@ useEffect(() => {
                                     </span>
                                   </div>
                                 ) : (
-                                  ""
+                                  "—"
                                 )}
                               </TableCell>
 
@@ -1816,7 +1894,7 @@ useEffect(() => {
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="â¢â¢â¢â¢â¢â¢â¢â¢"
+                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
               />
             </div>
             <div className="space-y-2">
@@ -1982,7 +2060,7 @@ useEffect(() => {
 
 
             <div className="space-y-2">
-              <Label>Rating (0â5)</Label>
+              <Label>Rating (0â€“5)</Label>
               <Input
                 type="number"
                 step="0.1"
@@ -2098,7 +2176,7 @@ useEffect(() => {
 
 
             <div className="space-y-2">
-              <Label>Rating (0â5)</Label>
+              <Label>Rating (0â€“5)</Label>
               <Input
                 type="number"
                 step="0.1"
@@ -2266,4 +2344,5 @@ useEffect(() => {
 };
 
 export default Admin;
+
 
