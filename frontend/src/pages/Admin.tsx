@@ -938,10 +938,6 @@ useEffect(() => {
                 Manage users, books, and monitor platform activity
               </p>
             </div>
-            <Button variant="outline" className="gap-2">
-              <Settings className="w-4 h-4" />
-              Settings
-            </Button>
           </div>
 
           {/* Stats Grid */}
@@ -1297,10 +1293,10 @@ useEffect(() => {
                                 )}
                               </TableCell>
 
-                              <TableCell>{book.author || "—"}</TableCell>
+                              <TableCell>{book.author || "â"}</TableCell>
 
                               <TableCell>
-                                <Badge variant="outline">{book.category || "—"}</Badge>
+                                <Badge variant="outline">{book.category || "â"}</Badge>
                               </TableCell>
 
                                                             <TableCell>
@@ -1312,7 +1308,7 @@ useEffect(() => {
                                     </span>
                                   </div>
                                 ) : (
-                                  "�"
+                                  ""
                                 )}
                               </TableCell>
 
@@ -1820,7 +1816,7 @@ useEffect(() => {
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="••••••••"
+                placeholder="â¢â¢â¢â¢â¢â¢â¢â¢"
               />
             </div>
             <div className="space-y-2">
@@ -1986,7 +1982,7 @@ useEffect(() => {
 
 
             <div className="space-y-2">
-              <Label>Rating (0–5)</Label>
+              <Label>Rating (0â5)</Label>
               <Input
                 type="number"
                 step="0.1"
@@ -2102,7 +2098,7 @@ useEffect(() => {
 
 
             <div className="space-y-2">
-              <Label>Rating (0–5)</Label>
+              <Label>Rating (0â5)</Label>
               <Input
                 type="number"
                 step="0.1"
