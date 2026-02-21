@@ -46,6 +46,23 @@ const Discover = () => {
   const newReleases = visibleBooks.filter((b) => b.publishedYear >= 2023);
   const audiobooks = visibleBooks.filter((b) => b.isAudiobook);
   const recommended = visibleBooks;
+  const booksByCategory = useMemo(() => {
+    const grouped = new Map<string, Book[]>();
+
+    visibleBooks.forEach((book) => {
+      const key = (book.category ?? "").trim() || "General";
+      const list = grouped.get(key) ?? [];
+      list.push(book);
+      grouped.set(key, list);
+    });
+
+    return Array.from(grouped.entries())
+      .map(([category, items]) => ({
+        category,
+        items,
+      }))
+      .sort((a, b) => a.category.localeCompare(b.category));
+  }, [visibleBooks]);
 
 
   return (
@@ -70,6 +87,15 @@ const Discover = () => {
             {audiobooks.length > 0 && <BookSection title="Audiobooks" books={audiobooks} />}
 
             <BookSection title="Recommended for You" books={recommended.length ? recommended : visibleBooks} />
+
+            {booksByCategory.length > 0 && (
+              <div className="space-y-10 pt-4">
+                <h2 className="text-2xl font-display font-bold text-foreground">Browse by Category</h2>
+                {booksByCategory.map(({ category, items }) => (
+                  <BookSection key={category} title={category} books={items} />
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>

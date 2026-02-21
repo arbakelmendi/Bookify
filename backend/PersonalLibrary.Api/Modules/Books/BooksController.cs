@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using PersonalLibrary.Api.Data;
 using PersonalLibrary.Api.Models;
 using PersonalLibrary.Api.Modules.Books.Dtos;
@@ -30,7 +31,10 @@ public class BooksController : ControllerBase
         var pageSize = q.PageSize < 1 ? 10 : q.PageSize;
         if (pageSize > 50) pageSize = 50; // cap
 
-        var query = _db.Books.AsNoTracking().AsQueryable();
+        var query = _db.Books
+            .AsNoTracking()
+            .Include(b => b.Category)
+            .AsQueryable();
 
         // Search (Title OR Author)
         if (!string.IsNullOrWhiteSpace(q.Search))
@@ -83,7 +87,17 @@ public class BooksController : ControllerBase
             .Take(pageSize)
             .ToListAsync();
 
-        var items = books.Select(b => b.ToDto()).ToList();
+        var bookIds = books.Select(b => b.Id).ToList();
+        var ratingsByBookId = await _db.BookRatings
+            .AsNoTracking()
+            .Where(r => bookIds.Contains(r.BookId))
+            .GroupBy(r => r.BookId)
+            .Select(g => new { BookId = g.Key, Avg = g.Average(x => (double)x.Value) })
+            .ToDictionaryAsync(x => x.BookId, x => (double?)Math.Round(x.Avg, 1));
+
+        var items = books
+            .Select(b => b.ToDto(ratingsByBookId.GetValueOrDefault(b.Id)))
+            .ToList();
 
         return Ok(new
         {
@@ -99,26 +113,39 @@ public class BooksController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<BookDto>> GetById(int id)
     {
-        var book = await _db.Books.AsNoTracking().FirstOrDefaultAsync(b => b.Id == id);
+        var book = await _db.Books
+            .AsNoTracking()
+            .Include(b => b.Category)
+            .FirstOrDefaultAsync(b => b.Id == id);
 
         if (book == null)
             return NotFound($"Book with id {id} not found");
 
-        return Ok(book.ToDto());
+        var rating = await _db.BookRatings
+            .AsNoTracking()
+            .Where(r => r.BookId == id)
+            .Select(r => (double?)r.Value)
+            .AverageAsync();
+
+        return Ok(book.ToDto(rating is null ? null : Math.Round(rating.Value, 1)));
     }
 
 // POST: /api/Books
 [HttpPost]
 public async Task<ActionResult<BookDto>> Create([FromBody] CreateBookDto dto)
 {
+    var categoryId = await ResolveCategoryIdAsync(dto.CategoryId, dto.Category);
+    if ((dto.CategoryId.HasValue || !string.IsNullOrWhiteSpace(dto.Category)) && categoryId is null)
+        return BadRequest("Invalid category.");
+
     var book = new Book
     {
         Title = dto.Title,
         Author = dto.Author,
         Description = dto.Description,
         CoverImageUrl = dto.CoverImageUrl,
-        Year = dto.Year,
-
+        Year = dto.Year ?? dto.PublishedYear,
+        CategoryId = categoryId,
         PdfUrl = dto.PdfUrl,
         PreviewUrl = dto.PreviewUrl
     };
@@ -126,7 +153,20 @@ public async Task<ActionResult<BookDto>> Create([FromBody] CreateBookDto dto)
     _db.Books.Add(book);
     await _db.SaveChangesAsync();
 
-    return CreatedAtAction(nameof(GetById), new { id = book.Id }, book.ToDto());
+    await UpsertMyRatingIfProvidedAsync(book.Id, dto.Rating);
+
+    await _db.Entry(book).Reference(b => b.Category).LoadAsync();
+    var rating = await _db.BookRatings
+        .AsNoTracking()
+        .Where(r => r.BookId == book.Id)
+        .Select(r => (double?)r.Value)
+        .AverageAsync();
+
+    return CreatedAtAction(
+        nameof(GetById),
+        new { id = book.Id },
+        book.ToDto(rating is null ? null : Math.Round(rating.Value, 1))
+    );
 }
 
 // PUT: /api/Books/5
@@ -137,16 +177,22 @@ public async Task<IActionResult> Update(int id, [FromBody] UpdateBookDto dto)
     if (book == null)
         return NotFound($"Book with id {id} not found");
 
+    var categoryId = await ResolveCategoryIdAsync(dto.CategoryId, dto.Category);
+    if ((dto.CategoryId.HasValue || !string.IsNullOrWhiteSpace(dto.Category)) && categoryId is null)
+        return BadRequest("Invalid category.");
+
     book.Title = dto.Title;
     book.Author = dto.Author;
     book.Description = dto.Description;
     book.CoverImageUrl = dto.CoverImageUrl;
-    book.Year = dto.Year;
+    book.Year = dto.Year ?? dto.PublishedYear;
+    book.CategoryId = categoryId;
 
     book.PdfUrl = dto.PdfUrl;
     book.PreviewUrl = dto.PreviewUrl;
 
     await _db.SaveChangesAsync();
+    await UpsertMyRatingIfProvidedAsync(book.Id, dto.Rating);
     return NoContent();
 }
 
@@ -199,5 +245,84 @@ public async Task<IActionResult> Update(int id, [FromBody] UpdateBookDto dto)
         HttpContext.Response.RegisterForDispose(upstream);
         HttpContext.Response.RegisterForDispose(stream);
         return File(stream, contentType);
+    }
+
+    private async Task<int?> ResolveCategoryIdAsync(int? categoryId, string? categoryName)
+    {
+        if (categoryId.HasValue)
+        {
+            var exists = await _db.Categories.AsNoTracking().AnyAsync(c => c.Id == categoryId.Value);
+            return exists ? categoryId : null;
+        }
+
+        var name = categoryName?.Trim();
+        if (string.IsNullOrWhiteSpace(name)) return null;
+
+        var match = await _db.Categories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Name.ToLower() == name.ToLower());
+
+        return match?.Id;
+    }
+
+    private async Task<int?> ResolveActorUserIdAsync()
+    {
+        var principal = HttpContext?.User;
+        if (principal != null)
+        {
+            var idStr =
+                principal.FindFirstValue(ClaimTypes.NameIdentifier) ??
+                principal.FindFirstValue("sub");
+
+            if (int.TryParse(idStr, out var id))
+            {
+                var exists = await _db.Users.AsNoTracking().AnyAsync(u => u.Id == id);
+                if (exists) return id;
+            }
+        }
+
+        var adminId = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.Role == "admin")
+            .OrderBy(u => u.Id)
+            .Select(u => (int?)u.Id)
+            .FirstOrDefaultAsync();
+        if (adminId.HasValue) return adminId;
+
+        return await _db.Users
+            .AsNoTracking()
+            .OrderBy(u => u.Id)
+            .Select(u => (int?)u.Id)
+            .FirstOrDefaultAsync();
+    }
+
+    private async Task UpsertMyRatingIfProvidedAsync(int bookId, double? rating)
+    {
+        if (!rating.HasValue) return;
+
+        var rounded = (int)Math.Round(rating.Value);
+        if (rounded < 1 || rounded > 5) return;
+
+        var userId = await ResolveActorUserIdAsync();
+        if (!userId.HasValue) return;
+
+        var row = await _db.BookRatings.FirstOrDefaultAsync(x => x.UserId == userId.Value && x.BookId == bookId);
+        if (row is null)
+        {
+            _db.BookRatings.Add(new BookRating
+            {
+                UserId = userId.Value,
+                BookId = bookId,
+                Value = rounded,
+                CreatedAt = DateTime.UtcNow,
+            });
+        }
+        else
+        {
+            row.Value = rounded;
+            row.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _db.SaveChangesAsync();
     }
 }

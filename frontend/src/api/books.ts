@@ -9,8 +9,14 @@ type ApiBook = {
   description?: string | null;
   coverImageUrl?: string | null;
   year?: number | null;
-
-  // ✅ Hybrid fields (optional)
+  pages?: number | null;
+  pageCount?: number | null;
+  duration?: string | null;
+  durationText?: string | null;
+  categoryId?: number | null;
+  category?: string | null;
+  categoryName?: string | null;
+  rating?: number | null;
   pdfUrl?: string | null;
   previewUrl?: string | null;
 };
@@ -24,10 +30,27 @@ type PagedResponse<T> = {
 };
 
 const DEFAULT_COVER = "https://placehold.co/200x300/png?text=Book";
+const BOOK_METADATA_OVERRIDES: Record<string, { pages?: number; duration?: string }> = {
+  "dracula": { pages: 418, duration: "12h 30m" },
+  "clean code": { pages: 464, duration: "14h 20m" },
+  "the midnight library": { pages: 304, duration: "8h 50m" },
+  "project hail mary": { pages: 496, duration: "16h 10m" },
+  "atomic habits": { pages: 320, duration: "5h 35m" },
+  "dune": { pages: 688, duration: "21h 2m" },
+  "the psychology of money": { pages: 256 },
+  "the silent patient": { pages: 336, duration: "8h 43m" },
+};
 
 export function mapApiBookToBook(apiBook: ApiBook): Book {
   const coverImageUrl = apiBook.coverImageUrl ?? "";
   const year = apiBook.year ?? undefined;
+  const titleKey = (apiBook.title ?? "").trim().toLowerCase();
+  const override = BOOK_METADATA_OVERRIDES[titleKey];
+  const pages = Number(apiBook.pages ?? apiBook.pageCount ?? override?.pages ?? 0) || 0;
+  const duration =
+    (apiBook.duration ?? apiBook.durationText ?? override?.duration ?? "").trim() || undefined;
+  const categoryName = (apiBook.categoryName ?? apiBook.category ?? "General").trim() || "General";
+  const ratingValue = typeof apiBook.rating === "number" ? apiBook.rating : 0;
 
   return {
     id: String(apiBook.id),
@@ -35,24 +58,21 @@ export function mapApiBookToBook(apiBook: ApiBook): Book {
     author: apiBook.author ?? "Unknown author",
     cover: coverImageUrl || DEFAULT_COVER,
     coverImageUrl: coverImageUrl || undefined,
-
-    rating: 0,
-    category: "General",
+    categoryId: apiBook.categoryId ?? null,
+    categoryName,
+    rating: ratingValue,
+    category: categoryName,
     description: apiBook.description ?? "No description available yet.",
-    pages: 0,
+    pages,
     publishedYear: year ?? 0,
     year,
-    duration: undefined,
+    duration,
     isAudiobook: false,
-
-    // ✅ Hybrid: backend decides
     pdfUrl: apiBook.pdfUrl ?? undefined,
     previewUrl: apiBook.previewUrl ?? undefined,
   };
 }
 
-
-// ✅ IMPORTANT: fetch more than 10 (backend is paged)
 export async function getBooks(params?: {
   search?: string;
   title?: string;
@@ -77,7 +97,6 @@ export async function getBookById(id: string): Promise<Book> {
   return mapApiBookToBook(data);
 }
 
-// ✅ library
 export async function getUserBooks(): Promise<UserBook[]> {
   return getMyLibrary();
 }

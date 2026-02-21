@@ -1,0 +1,1 @@
+public record UpdateCategoryDto(string Name);

@@ -1,37 +1,69 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PersonalLibrary.Api.Data;
+using PersonalLibrary.Api.Models;
 using PersonalLibrary.Api.Modules.Categories.Dtos;
 
-namespace PersonalLibrary.Api.Modules.Categories;
-
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/categories")]
 public class CategoriesController : ControllerBase
 {
-    private readonly CategoriesService _service;
-
-    public CategoriesController(CategoriesService service)
-    {
-        _service = service;
-    }
+    private readonly AppDbContext _db;
+    public CategoriesController(AppDbContext db) => _db = db;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
-        => Ok(await _service.GetAllAsync());
+    public async Task<ActionResult<List<CategoryDto>>> GetAll()
+    {
+        var items = await _db.Categories
+            .OrderBy(c => c.Name)
+            .Select(c => new CategoryDto(c.Id, c.Name))
+            .ToListAsync();
 
-    [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetById(int id)
-        => Ok(await _service.GetByIdAsync(id));
+        return Ok(items);
+    }
 
     [HttpPost]
-    public async Task<IActionResult> Create(CreateCategoryDto dto)
-        => Ok(await _service.CreateAsync(dto));
+    public async Task<ActionResult<CategoryDto>> Create(CreateCategoryDto dto)
+    {
+        var name = dto.Name.Trim();
+        if (string.IsNullOrWhiteSpace(name)) return BadRequest("Name required.");
+
+        var exists = await _db.Categories.AnyAsync(c => c.Name == name);
+        if (exists) return Conflict("Category already exists.");
+
+        var cat = new Category { Name = name };
+        _db.Categories.Add(cat);
+        await _db.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetAll), new CategoryDto(cat.Id, cat.Name));
+    }
 
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, CreateCategoryDto dto)
-        => await _service.UpdateAsync(id, dto) ? NoContent() : NotFound();
+    public async Task<ActionResult<CategoryDto>> Update(int id, UpdateCategoryDto dto)
+    {
+        var cat = await _db.Categories.FindAsync(id);
+        if (cat is null) return NotFound();
+
+        var name = dto.Name.Trim();
+        if (string.IsNullOrWhiteSpace(name)) return BadRequest("Name required.");
+
+        var exists = await _db.Categories.AnyAsync(c => c.Name == name && c.Id != id);
+        if (exists) return Conflict("Category name already used.");
+
+        cat.Name = name;
+        await _db.SaveChangesAsync();
+
+        return Ok(new CategoryDto(cat.Id, cat.Name));
+    }
 
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
-        => await _service.DeleteAsync(id) ? NoContent() : NotFound();
+    {
+        var cat = await _db.Categories.FindAsync(id);
+        if (cat is null) return NotFound();
+
+        _db.Categories.Remove(cat);
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
 }

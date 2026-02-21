@@ -1,15 +1,54 @@
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Star, Headphones, Play, Plus, BookOpen, Clock, Users, TrendingUp, BookMarked } from "lucide-react";
+import { Star, Headphones, Plus, BookOpen, Clock, Users, TrendingUp, BookMarked } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { mockBooks } from "@/data/mockData";
 import { useAuth } from "@/contexts/AuthContext";
+import { getBooks } from "@/api/books";
+import type { Book } from "@/types/book";
 
 export const HeroSection = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const featuredBook = mockBooks[0];
+  const [featuredBooks, setFeaturedBooks] = useState<Book[]>([]);
+  const [featuredIndex, setFeaturedIndex] = useState(0);
+  const featuredBook = useMemo(() => {
+    if (isAuthenticated && featuredBooks.length > 0) {
+      return featuredBooks[featuredIndex % featuredBooks.length];
+    }
+    return mockBooks[0];
+  }, [isAuthenticated, featuredBooks, featuredIndex]);
   const coverSrc = featuredBook.coverImageUrl || featuredBook.cover || "https://placehold.co/600x900/png?text=Book";
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let active = true;
+
+    (async () => {
+      try {
+        const books = await getBooks({ page: 1, pageSize: 50, sortBy: "id", sortDir: "desc" });
+        if (!active) return;
+        setFeaturedBooks(books.filter((b) => b?.id && b?.title));
+      } catch {
+        if (!active) return;
+        setFeaturedBooks([]);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || featuredBooks.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setFeaturedIndex((prev) => (prev + 1) % featuredBooks.length);
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [isAuthenticated, featuredBooks.length]);
 
   const handleBookClick = () => {
     navigate(`/books/${featuredBook.id}`);
@@ -171,7 +210,8 @@ export const HeroSection = () => {
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6 }}
-            className="space-y-6"
+            className="space-y-6 cursor-pointer"
+            onClick={handleBookClick}
           >
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/20 text-primary text-sm">
               <Star className="w-4 h-4 fill-current" />
@@ -201,7 +241,7 @@ export const HeroSection = () => {
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <BookOpen className="w-5 h-5" />
-                <span>{featuredBook.pages} pages</span>
+                <span>{featuredBook.pages > 0 ? `${featuredBook.pages} pages` : "Pages unavailable"}</span>
               </div>
               {featuredBook.duration && (
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -212,16 +252,17 @@ export const HeroSection = () => {
             </div>
 
             <div className="flex gap-4 pt-2">
-              <Button size="lg" className="gap-2">
+              <Button
+                size="lg"
+                className="gap-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/books/${featuredBook.id}`);
+                }}
+              >
                 <Plus className="w-5 h-5" />
                 Add to Library
               </Button>
-              {featuredBook.isAudiobook && (
-                <Button size="lg" variant="outline" className="gap-2">
-                  <Play className="w-5 h-5" />
-                  Listen Now
-                </Button>
-              )}
             </div>
           </motion.div>
 

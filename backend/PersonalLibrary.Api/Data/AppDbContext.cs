@@ -18,6 +18,7 @@ public class AppDbContext : DbContext
     public DbSet<BookRecommendation> BookRecommendations => Set<BookRecommendation>();
     public DbSet<Notification> Notifications => Set<Notification>();
 
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -34,6 +35,17 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<UserBook>()
             .HasIndex(ub => new { ub.UserId, ub.BookId })
             .IsUnique();
+
+
+         modelBuilder.Entity<Category>()
+            .HasIndex(c => c.Name)
+            .IsUnique();
+
+         modelBuilder.Entity<Book>()
+            .HasOne(b => b.Category)
+            .WithMany(c => c.Books)
+            .HasForeignKey(b => b.CategoryId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<FriendRequest>()
             .HasIndex(fr => new { fr.SenderId, fr.ReceiverId })
@@ -76,4 +88,8 @@ public class AppDbContext : DbContext
             .HasForeignKey(n => n.UserId)
             .OnDelete(DeleteBehavior.Cascade);
     }
+
+
+
+
 }

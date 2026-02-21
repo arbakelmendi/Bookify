@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, BookOpen, Gift, Plus, X } from "lucide-react";
+import { ArrowLeft, BookOpen, Calendar, Clock3, FileText, Gift, Plus, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
@@ -264,6 +264,35 @@ const BookDetail = () => {
     return allBooks.filter((candidate) => candidate.id !== book.id).slice(0, 8);
   }, [allBooks, book]);
 
+  const topTags = useMemo(() => {
+    if (!book) return [];
+    const tags: string[] = [];
+    if (book.category?.trim()) tags.push(book.category.trim());
+    if (book.isAudiobook) tags.push("Audiobook");
+    if (book.pdfUrl) tags.push("eBook");
+    return Array.from(new Set(tags));
+  }, [book]);
+
+  const ratingValue = typeof book?.rating === "number" ? Math.max(0, Math.min(5, book.rating)) : 0;
+
+  const displayPages = useMemo(() => {
+    if (readingProgress?.totalPages && readingProgress.totalPages > 0) return readingProgress.totalPages;
+    if (book?.pages && book.pages > 0) return book.pages;
+    return null;
+  }, [book?.pages, readingProgress?.totalPages]);
+
+  const displayDuration = useMemo(() => {
+    const fixed = book?.duration?.trim();
+    if (fixed) return fixed;
+    if (!displayPages) return null;
+
+    const totalMinutes = Math.round((displayPages / 45) * 60);
+    if (totalMinutes < 60) return `~${totalMinutes} min`;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return minutes > 0 ? `~${hours}h ${minutes}m` : `~${hours}h`;
+  }, [book?.duration, displayPages]);
+
   const readButtonLabel = useMemo(() => {
     if (progressLoading) return "Read Book";
 
@@ -303,7 +332,13 @@ const BookDetail = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <main className="flex-1">
-        <div className="mx-auto max-w-7xl px-6 lg:px-8 py-8">
+        <div className="relative overflow-hidden border-b bg-muted/40">
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-15 blur-sm scale-110"
+            style={{ backgroundImage: `url(${coverSrc})` }}
+          />
+          <div className="absolute inset-0 bg-background/80" />
+          <div className="relative mx-auto max-w-7xl px-6 lg:px-8 py-8">
           <Button variant="ghost" onClick={() => navigate(-1)} className="mb-6">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
@@ -322,15 +357,32 @@ const BookDetail = () => {
             </div>
 
             <div className="space-y-4">
-              <Badge variant="secondary">{book.category}</Badge>
+              <div className="flex flex-wrap gap-2">
+                {(topTags.length > 0 ? topTags : ["General"]).map((tag) => (
+                  <Badge key={`top-${tag}`} variant="secondary">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
 
               <h1 className="text-3xl font-bold">{book.title}</h1>
               <p className="text-muted-foreground">
                 by <span className="text-foreground font-medium">{book.author}</span>
               </p>
 
-              <div className="text-sm text-muted-foreground">
-                <span>Published: {book.publishedYear || (book as any)?.year || "-"}</span>
+              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <FileText className="h-4 w-4" />
+                  {displayPages ? `${displayPages} pages` : "Pages unavailable"}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock3 className="h-4 w-4" />
+                  {displayDuration || "Duration unavailable"}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  Published {book.publishedYear || (book as any)?.year || "-"}
+                </span>
               </div>
 
               <FeedbackPanel bookId={Number(book.id)} mode="summary" />
@@ -379,6 +431,66 @@ const BookDetail = () => {
               )}
 
               {addError && <p className="text-destructive text-sm">{addError}</p>}
+            </div>
+          </div>
+          </div>
+        </div>
+
+        <div className="mx-auto max-w-7xl px-6 lg:px-8 py-8">
+          <div className="grid gap-8 md:grid-cols-3 mb-8">
+            <div>
+              <h3 className="font-semibold mb-3">Book Details</h3>
+              <div className="space-y-2 text-sm">
+                <p className="flex items-center justify-between border-b pb-2">
+                  <span className="text-muted-foreground">Author</span>
+                  <span>{book.author}</span>
+                </p>
+                <p className="flex items-center justify-between border-b pb-2">
+                  <span className="text-muted-foreground">Published</span>
+                  <span>{book.publishedYear || (book as any)?.year || "-"}</span>
+                </p>
+                <p className="flex items-center justify-between border-b pb-2">
+                  <span className="text-muted-foreground">Format</span>
+                  <span>{book.isAudiobook ? "Audiobook" : "eBook"}</span>
+                </p>
+                <p className="flex items-center justify-between border-b pb-2">
+                  <span className="text-muted-foreground">Pages</span>
+                  <span>{displayPages ?? "-"}</span>
+                </p>
+                <p className="flex items-center justify-between border-b pb-2">
+                  <span className="text-muted-foreground">Duration</span>
+                  <span>{displayDuration ?? "-"}</span>
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-3">Reading Stats</h3>
+              <div className="space-y-2 text-sm">
+                <p className="flex items-center justify-between border-b pb-2">
+                  <span className="text-muted-foreground">My status</span>
+                  <span>{readingProgress?.status || "Not started"}</span>
+                </p>
+                <p className="flex items-center justify-between border-b pb-2">
+                  <span className="text-muted-foreground">Current page</span>
+                  <span>{readingProgress?.currentPage ?? 1}</span>
+                </p>
+                <p className="flex items-center justify-between border-b pb-2">
+                  <span className="text-muted-foreground">Average rating</span>
+                  <span>{ratingValue > 0 ? ratingValue.toFixed(1) : "-"}</span>
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-3">Genres and Tags</h3>
+              <div className="flex flex-wrap gap-2">
+                {(topTags.length > 0 ? topTags : ["General"]).map((tag) => (
+                  <Badge key={`bottom-${tag}`} variant="outline">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
             </div>
           </div>
 

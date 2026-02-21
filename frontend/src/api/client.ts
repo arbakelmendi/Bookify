@@ -1,5 +1,5 @@
 const BASE_URL = import.meta.env.DEV
-  ? ""
+  ? (import.meta.env.VITE_API_BASE_URL ?? "")
   : (import.meta.env.VITE_API_BASE_URL ?? "");
 
 const TOKEN_KEY = "bookify_auth_token";
@@ -16,7 +16,10 @@ function getAuthHeaders(): HeadersInit {
 }
 
 function buildUrl(path: string, params?: Record<string, any>): string {
-  const url = new URL(`${BASE_URL}${path}`, window.location.origin);
+  // ✅ nëse BASE_URL është bosh, përdor origin-in aktual (vite dev)
+  // ✅ nëse BASE_URL është p.sh. http://localhost:5116, shkon direkt te backend
+  const base = BASE_URL && BASE_URL.trim().length > 0 ? BASE_URL : window.location.origin;
+  const url = new URL(path, base);
 
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
@@ -31,28 +34,22 @@ function buildUrl(path: string, params?: Record<string, any>): string {
     });
   }
 
-  return url.pathname + url.search;
+  // ✅ Ktheje FULL url
+  return url.toString();
 }
 
 async function extractErrorMessage(response: Response): Promise<string> {
-  // try json first
   try {
     const data = await response.clone().json();
     if (data?.message) return String(data.message);
     if (data?.error) return String(data.error);
-  } catch {
-    // ignore
-  }
+  } catch {}
 
-  // fallback to text
   try {
     const text = (await response.clone().text()).trim();
     if (text) return text;
-  } catch {
-    // ignore
-  }
+  } catch {}
 
-  // last resort generic
   return "Request failed.";
 }
 
@@ -65,7 +62,6 @@ async function handleResponse<T>(response: Response): Promise<T> {
     }
 
     const msg = await extractErrorMessage(response);
-    // ✅ never prefix with HTTP 403:
     throw new Error(msg);
   }
 
@@ -82,7 +78,7 @@ export async function apiGet<T>(path: string, params?: Record<string, any>): Pro
 }
 
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(buildUrl(path), {
     method: "POST",
     headers: getAuthHeaders(),
     body: body ? JSON.stringify(body) : undefined,
@@ -91,7 +87,7 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
 }
 
 export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(buildUrl(path), {
     method: "PUT",
     headers: getAuthHeaders(),
     body: body ? JSON.stringify(body) : undefined,
@@ -100,7 +96,7 @@ export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
 }
 
 export async function apiDelete<T>(path: string): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(buildUrl(path), {
     method: "DELETE",
     headers: getAuthHeaders(),
   });

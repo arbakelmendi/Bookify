@@ -5,7 +5,7 @@ namespace PersonalLibrary.Api.Modules.Books.Mappers;
 
 public static class BookMapper
 {
-public static BookDto ToDto(this Book b)
+public static BookDto ToDto(this Book b, double? rating = null)
 {
     return new BookDto
     {
@@ -15,6 +15,9 @@ public static BookDto ToDto(this Book b)
         Description = b.Description,
         CoverImageUrl = b.CoverImageUrl,
         Year = b.Year,
+        CategoryId = b.CategoryId,
+        Category = b.Category?.Name,
+        Rating = rating,
         PdfUrl = b.PdfUrl,
         PreviewUrl = b.PreviewUrl
     };

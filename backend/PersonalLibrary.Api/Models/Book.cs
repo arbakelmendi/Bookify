@@ -23,6 +23,10 @@ public class Book
     public string? PdfUrl { get; set; }
     public string? PreviewUrl { get; set; }
 
+    public int? CategoryId { get; set; }
+    public Category? Category { get; set; }
+
+
 
 
 }

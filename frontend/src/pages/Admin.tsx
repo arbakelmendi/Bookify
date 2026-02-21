@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
+
+
 import {
   Users,
   BookOpen,
@@ -21,7 +23,15 @@ import {
   Star,
   Check,
   X,
-} from "lucide-react";
+  Tag,
+}from "lucide-react";
+import {
+  getCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  type CategoryDto,
+} from "@/api/categories";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -125,20 +135,6 @@ const COLORS = [
   "hsl(var(--chart-4))",
   "hsl(var(--chart-5))",
 ];
-
-const BOOK_CATEGORIES = [
-  "Fiction",
-  "Sci-Fi",
-  "Fantasy",
-  "Thriller",
-  "Romance",
-  "Self-Help",
-  "Finance",
-  "Biography",
-  "Non-Fiction",
-  "Psychology",
-  "Other",
-] as const;
 
 
 interface UserFormData {
@@ -258,6 +254,18 @@ const Admin = () => {
     comment: "",
   });
   const [reviewCreateBookSearch, setReviewCreateBookSearch] = useState("");
+
+    // -------------------- Categories state --------------------
+  const [categories, setCategories] = useState<CategoryDto[]>([]);
+  const [catLoading, setCatLoading] = useState(false);
+  const [catCreateLoading, setCatCreateLoading] = useState(false);
+  const [catError, setCatError] = useState<string | null>(null);
+
+  const [newCategoryName, setNewCategoryName] = useState("");
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState("");
+
 
   // Redirect if not admin
   if (!isAdmin) return <Navigate to="/login" replace />;
@@ -381,6 +389,19 @@ const Admin = () => {
       })
       .sort((a, b) => a.id - b.id);
   }, [books, bookSearch]);
+
+  const bookCategoryOptions = useMemo(() => {
+    const names = categories.map((c) => c.name.trim()).filter(Boolean);
+    return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
+  }, [categories]);
+
+  const categorySelectOptions = useMemo(() => {
+    const currentCategory = (bookForm.category ?? "").trim();
+    if (currentCategory && !bookCategoryOptions.includes(currentCategory)) {
+      return [...bookCategoryOptions, currentCategory];
+    }
+    return bookCategoryOptions;
+  }, [bookCategoryOptions, bookForm.category]);
 
   // Create user
   const handleCreateUser = async () => {
@@ -514,9 +535,9 @@ const Admin = () => {
         description: bookForm.description.trim(),
         coverImageUrl: bookForm.coverImageUrl.trim() || null,
         category: bookForm.category.trim() || null,
-        rating: Number.isFinite(bookForm.rating) ? bookForm.rating : null,
+        rating: Number.isFinite(bookForm.rating) && bookForm.rating > 0 ? bookForm.rating : null,
         isAudiobook: !!bookForm.isAudiobook,
-        publishedYear: bookForm.publishedYear ?? null,
+        year: bookForm.publishedYear ?? null,
         pdfUrl: bookForm.pdfUrl.trim() || null,
         previewUrl: bookForm.previewUrl.trim() || null,
       };
@@ -566,9 +587,9 @@ const Admin = () => {
         description: bookForm.description.trim(),
         coverImageUrl: bookForm.coverImageUrl.trim() || null,
         category: bookForm.category.trim() || null,
-        rating: Number.isFinite(bookForm.rating) ? bookForm.rating : null,
+        rating: Number.isFinite(bookForm.rating) && bookForm.rating > 0 ? bookForm.rating : null,
         isAudiobook: !!bookForm.isAudiobook,
-        publishedYear: bookForm.publishedYear ?? null,
+        year: bookForm.publishedYear ?? null,
         pdfUrl: bookForm.pdfUrl.trim() || null,
         previewUrl: bookForm.previewUrl.trim() || null,
       };
@@ -620,6 +641,97 @@ const Admin = () => {
       });
     }
   };
+
+  async function loadCategories() {
+  setCatLoading(true);
+  setCatError(null);
+  try {
+    const data = await getCategories();
+    // sort alfabetik
+    data.sort((a, b) => a.name.localeCompare(b.name));
+    setCategories(data);
+  } catch (e: any) {
+    setCatError(e?.message ?? "Failed to load categories.");
+  } finally {
+    setCatLoading(false);
+  }
+}
+
+async function handleCreateCategory() {
+  const name = newCategoryName.trim();
+  if (!name) {
+    toast({
+      title: "Validation Error",
+      description: "Category name is required.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  setCatError(null);
+  setCatCreateLoading(true);
+  try {
+    const created = await createCategory(name);
+    toast({ title: "Category created" });
+    setNewCategoryName("");
+    setCategories((prev) =>
+      [...prev, created].sort((a, b) => a.name.localeCompare(b.name))
+    );
+  } catch (e: any) {
+    const message = e?.message ?? "Failed to create category.";
+    setCatError(message);
+    toast({
+      title: "Error",
+      description: message,
+      variant: "destructive",
+    });
+  } finally {
+    setCatCreateLoading(false);
+  }
+}
+
+function startEditCategory(cat: CategoryDto) {
+  setEditingId(cat.id);
+  setEditingName(cat.name);
+}
+
+function cancelEditCategory() {
+  setEditingId(null);
+  setEditingName("");
+}
+
+async function handleUpdateCategory() {
+  if (editingId === null) return;
+
+  const name = editingName.trim();
+  if (!name) return;
+
+  setCatError(null);
+  try {
+    await updateCategory(editingId, name);
+    cancelEditCategory();
+    await loadCategories();
+  } catch (e: any) {
+    setCatError(e?.message ?? "Failed to update category.");
+  }
+}
+
+async function handleDeleteCategory(id: number) {
+  const ok = window.confirm("Are you sure you want to delete this category?");
+  if (!ok) return;
+
+  setCatError(null);
+  try {
+    await deleteCategory(id);
+    await loadCategories();
+  } catch (e: any) {
+    setCatError(e?.message ?? "Failed to delete category.");
+  }
+}
+useEffect(() => {
+  loadCategories();
+}, []);
+
 
   const resetReviewForm = () => {
     setReviewForm({
@@ -865,7 +977,7 @@ const Admin = () => {
 
           {/* Main Content */}
           <Tabs defaultValue="users" className="space-y-6">
-            <TabsList className="grid w-full max-w-2xl grid-cols-4">
+            <TabsList className="grid w-full max-w-2xl grid-cols-5">
               <TabsTrigger value="users" className="gap-2">
                 <Users className="w-4 h-4" />
                 Users
@@ -882,6 +994,11 @@ const Admin = () => {
                 <MessageSquare className="w-4 h-4" />
                 Reviews
               </TabsTrigger>
+              <TabsTrigger value="categories" className="gap-2">
+              <Tag className="w-4 h-4" />
+              Categories
+            </TabsTrigger>
+
             </TabsList>
 
             {/* Users Tab */}
@@ -982,7 +1099,7 @@ const Admin = () => {
               </Card>
             </TabsContent>
 
-            {/* Analytics Tab */}
+             {/* Analytics Tab */}
             <TabsContent value="analytics">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
@@ -1186,8 +1303,17 @@ const Admin = () => {
                                 <Badge variant="outline">{book.category || "—"}</Badge>
                               </TableCell>
 
-                              <TableCell>
-                                {typeof book.rating === "number" ? `⭐ ${book.rating}` : "—"}
+                                                            <TableCell>
+                                {typeof book.rating === "number" && book.rating > 0 ? (
+                                  <div className="flex items-center gap-2">
+                                    {renderStars(Math.round(book.rating))}
+                                    <span className="text-sm text-muted-foreground">
+                                      {book.rating.toFixed(1)}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  "�"
+                                )}
                               </TableCell>
 
                               <TableCell>
@@ -1254,7 +1380,8 @@ const Admin = () => {
               </Card>
             </TabsContent>
 
-            {/* Reviews Tab */}
+
+                 {/* Reviews Tab */}
             <TabsContent value="reviews">
               <Card>
                 <CardHeader>
@@ -1508,6 +1635,151 @@ const Admin = () => {
                 </CardContent>
               </Card>
             </TabsContent>
+                          
+            {/* Categories Tab (MOVED AFTER REVIEWS) */}
+  <TabsContent value="categories">
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <CardTitle>Categories</CardTitle>
+            <CardDescription>Add, edit, or delete book categories.</CardDescription>
+          </div>
+
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleCreateCategory();
+            }}
+          >
+            <div className="relative w-72">
+              <Input
+                placeholder="New category name..."
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+              />
+            </div>
+
+            <Button
+              type="submit"
+              disabled={catLoading || catCreateLoading}
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              {catCreateLoading ? "Adding..." : "Add"}
+            </Button>
+
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={loadCategories}
+              disabled={catLoading || catCreateLoading}
+              title="Refresh categories"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+          </form>
+        </div>
+      </CardHeader>
+
+      <CardContent>
+        {catLoading ? (
+          <div className="text-center py-12">
+            <RefreshCw className="w-8 h-8 mx-auto mb-4 animate-spin text-primary" />
+            <p className="text-muted-foreground">Loading categories...</p>
+          </div>
+        ) : catError ? (
+          <p className="text-destructive">{catError}</p>
+        ) : categories.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Tag className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>No categories yet</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+
+            <TableBody>
+              {categories.map((cat) => {
+                const isEditing = editingId === cat.id;
+
+                return (
+                  <TableRow key={cat.id}>
+                    <TableCell className="font-medium">{cat.id}</TableCell>
+
+                    <TableCell>
+                      {isEditing ? (
+                        <Input
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          className="max-w-sm"
+                        />
+                      ) : (
+                        <span className="font-medium">{cat.name}</span>
+                      )}
+                    </TableCell>
+
+                    <TableCell className="text-right">
+                      {isEditing ? (
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            onClick={handleUpdateCategory}
+                            disabled={!editingName.trim() || catLoading}
+                          >
+                            Save
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={cancelEditCategory}
+                            disabled={catLoading}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => startEditCategory(cat)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDeleteCategory(cat.id)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  </TabsContent>
+              
           </Tabs>
         </motion.div>
       </div>
@@ -1693,14 +1965,17 @@ const Admin = () => {
             <div className="space-y-2">
               <Label>Category</Label>
               <Select
-                value={bookForm.category || "Other"}
-                onValueChange={(value) => setBookForm({ ...bookForm, category: value })}
+                value={(bookForm.category ?? "").trim() || "__none"}
+                onValueChange={(value) =>
+                  setBookForm({ ...bookForm, category: value === "__none" ? "" : value })
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {BOOK_CATEGORIES.map((c) => (
+                  <SelectItem value="__none">No category</SelectItem>
+                  {categorySelectOptions.map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
                     </SelectItem>
@@ -1806,14 +2081,17 @@ const Admin = () => {
             <div className="space-y-2">
               <Label>Category</Label>
               <Select
-                value={bookForm.category || "Other"}
-                onValueChange={(value) => setBookForm({ ...bookForm, category: value })}
+                value={(bookForm.category ?? "").trim() || "__none"}
+                onValueChange={(value) =>
+                  setBookForm({ ...bookForm, category: value === "__none" ? "" : value })
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {BOOK_CATEGORIES.map((c) => (
+                  <SelectItem value="__none">No category</SelectItem>
+                  {categorySelectOptions.map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
                     </SelectItem>
@@ -1992,3 +2270,4 @@ const Admin = () => {
 };
 
 export default Admin;
+
