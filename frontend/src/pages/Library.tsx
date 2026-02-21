@@ -246,11 +246,6 @@ const Library = () => {
           </div>
         </motion.div>
 
-        <div className="text-xs opacity-60 mb-3">
-          URL: {window.location.search || "(none)"} | filter={activeFilter} | shown=
-          {filteredItems.length}/{normalizedItems.length}
-        </div>
-
         {error && <p className="text-destructive mb-4">{error}</p>}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
