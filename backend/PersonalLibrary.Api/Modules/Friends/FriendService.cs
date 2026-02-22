@@ -93,7 +93,7 @@ public class FriendService
 
         var friends = await _context.Users
             .Where(u => friendIds.Contains(u.Id))
-            .Select(u => new { u.Id, u.Email })
+            .Select(u => new { u.Id, u.Email, u.Username })
             .ToListAsync();
 
         return friends.Cast<object>().ToList();
@@ -232,6 +232,34 @@ public class FriendService
         await _context.SaveChangesAsync();
 
         return (true, "");
+    }
+
+    // ✅ Get a friend's library (books only, no progress details)
+    public async Task<(bool ok, string error, List<FriendLibraryBookDto>? books)> GetFriendLibraryAsync(int userId, int friendId)
+    {
+        var areFriends = await _context.FriendRequests
+            .AsNoTracking()
+            .AnyAsync(fr =>
+                fr.Status == FriendRequestStatuses.Accepted &&
+                ((fr.SenderId == userId && fr.ReceiverId == friendId) ||
+                 (fr.SenderId == friendId && fr.ReceiverId == userId)));
+
+        if (!areFriends)
+            return (false, "You are not friends with this user.", null);
+
+        var books = await _context.UserBooks
+            .AsNoTracking()
+            .Where(ub => ub.UserId == friendId)
+            .Select(ub => new FriendLibraryBookDto(
+                ub.BookId,
+                ub.Book!.Title,
+                ub.Book!.Author,
+                ub.Book!.CoverImageUrl,
+                ub.Status
+            ))
+            .ToListAsync();
+
+        return (true, "", books);
     }
 
     // ✅ Remove friend (deletes accepted relationship)

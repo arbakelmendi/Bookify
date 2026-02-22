@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Users, UserPlus, Search, Filter, Bell } from "lucide-react";
+import { Users, UserPlus, Search, Filter, Bell, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { AddFriendDialog } from "@/components/friends/AddFriendDialog";
 import { friendsApi } from "@/api/friends";
 
-type FriendUser = { id: number; email: string };
+type FriendUser = { id: number; email: string; username?: string };
 
 type FriendRequestViewDto = {
   id: number;
@@ -29,6 +30,7 @@ type FriendRequestViewDto = {
 type TabValue = "friends" | "requests" | "outgoing";
 
 const Friends = () => {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<TabValue>("friends");
   const [searchQuery, setSearchQuery] = useState("");
   const [addFriendOpen, setAddFriendOpen] = useState(false);
@@ -209,18 +211,33 @@ const Friends = () => {
                       className="p-4 bg-card border border-border rounded-lg flex items-center justify-between gap-3"
                     >
                       <div className="min-w-0">
-                        <p className="font-medium text-foreground truncate">{f.email}</p>
-                        <p className="text-sm text-muted-foreground">User #{f.id}</p>
+                        <p className="font-medium text-foreground truncate">{f.username || f.email}</p>
+                        <p className="text-sm text-muted-foreground truncate">{f.email}</p>
                       </div>
 
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => removeFriend(f.id)}
-                        disabled={actionLoadingId === f.id}
-                      >
-                        {actionLoadingId === f.id ? "Removing..." : "Remove"}
-                      </Button>
+                      <div className="flex gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="gap-1.5"
+                          onClick={() =>
+                            navigate(`/friend/${f.id}`, {
+                              state: { email: f.email, username: f.username },
+                            })
+                          }
+                        >
+                          <BookOpen className="w-3.5 h-3.5" />
+                          Library
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => removeFriend(f.id)}
+                          disabled={actionLoadingId === f.id}
+                        >
+                          {actionLoadingId === f.id ? "Removing..." : "Remove"}
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>

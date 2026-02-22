@@ -142,6 +142,24 @@ public class FriendsController : ControllerBase
         return NoContent();
     }
 
+    // GET: /api/Friends/{friendId}/library
+    [HttpGet("{friendId:int}/library")]
+    public async Task<IActionResult> GetFriendLibrary(int friendId)
+    {
+        var userId = GetUserId();
+        var (ok, error, books) = await _service.GetFriendLibraryAsync(userId, friendId);
+
+        if (!ok)
+        {
+            if (error.Contains("not friends", StringComparison.OrdinalIgnoreCase))
+                return Forbid();
+
+            return BadRequest(new { message = error });
+        }
+
+        return Ok(books);
+    }
+
     // DELETE: /api/Friends/remove/{friendId}
     [HttpDelete("remove/{friendId:int}")]
     public async Task<IActionResult> RemoveFriend(int friendId)
