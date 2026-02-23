@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, BookOpen } from "lucide-react";
+import { ArrowLeft, BookOpen, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { friendsApi, FriendLibraryBook } from "@/api/friends";
 
@@ -88,6 +88,25 @@ const FriendProfile = () => {
               <p className="text-muted-foreground text-sm">{state.email}</p>
             )}
           </motion.div>
+
+          {friendNumericId && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="pb-1"
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/messages?friend=${friendNumericId}`)}
+                className="gap-2"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Message
+              </Button>
+            </motion.div>
+          )}
         </div>
 
         {/* Stats row */}

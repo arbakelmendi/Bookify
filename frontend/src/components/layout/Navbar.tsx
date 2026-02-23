@@ -11,6 +11,7 @@ import {
   User,
   Shield,
   Gift,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,12 +25,14 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { getInboxRecommendations } from "@/api/recommendations";
 import { friendsApi } from "@/api/friends";
+import { messagesApi } from "@/api/messages";
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [giftCount, setGiftCount] = useState<number>(0);
   const [friendRequestCount, setFriendRequestCount] = useState<number>(0);
+  const [unreadMessageCount, setUnreadMessageCount] = useState<number>(0);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -44,7 +47,8 @@ export const Navbar = () => {
         { name: "My Library", path: "/library" },
         { name: "Progress", path: "/dashboard" },
         { name: "Friends", path: "/friends" },
-        { name: "Gifts", path: "/gifts" } // ✅ NEW
+        { name: "Messages", path: "/messages" },
+        { name: "Gifts", path: "/gifts" }
       );
     }
 
@@ -62,6 +66,7 @@ export const Navbar = () => {
     if (!isAuthenticated) {
       setGiftCount(0);
       setFriendRequestCount(0);
+      setUnreadMessageCount(0);
       return;
     }
 
@@ -69,17 +74,24 @@ export const Navbar = () => {
 
     const load = async () => {
       try {
-        const [inbox, incomingCount] = await Promise.all([
+        const [inbox, incomingCount, conversations] = await Promise.all([
           getInboxRecommendations(),
           friendsApi.incomingCount(),
+          messagesApi.conversations(),
         ]);
         if (!active) return;
         setGiftCount(Array.isArray(inbox) ? inbox.length : 0);
         setFriendRequestCount(Number(incomingCount?.count ?? 0));
+        setUnreadMessageCount(
+          Array.isArray(conversations)
+            ? conversations.reduce((s: number, c: { unreadCount: number }) => s + c.unreadCount, 0)
+            : 0
+        );
       } catch {
         if (!active) return;
         setGiftCount(0);
         setFriendRequestCount(0);
+        setUnreadMessageCount(0);
       }
     };
 
@@ -136,6 +148,7 @@ export const Navbar = () => {
               const isActive = location.pathname === link.path;
               const isGifts = link.path === "/gifts";
               const isFriends = link.path === "/friends";
+              const isMessages = link.path === "/messages";
 
               return (
                 <Link
@@ -149,9 +162,9 @@ export const Navbar = () => {
                 >
                   <span className="inline-flex items-center gap-2">
                     {isGifts && <Gift className="w-4 h-4" />}
+                    {isMessages && <MessageCircle className="w-4 h-4" />}
                     {link.name}
 
-                    {/* ✅ badge */}
                     {isGifts && isAuthenticated && giftCount > 0 && (
                       <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] leading-none">
                         {giftCount > 99 ? "99+" : giftCount}
@@ -160,6 +173,11 @@ export const Navbar = () => {
                     {isFriends && isAuthenticated && friendRequestCount > 0 && (
                       <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] leading-none">
                         {friendRequestCount > 99 ? "99+" : friendRequestCount}
+                      </span>
+                    )}
+                    {isMessages && isAuthenticated && unreadMessageCount > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] leading-none">
+                        {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
                       </span>
                     )}
                   </span>
@@ -286,6 +304,7 @@ export const Navbar = () => {
                 const isActive = location.pathname === link.path;
                 const isGifts = link.path === "/gifts";
                 const isFriends = link.path === "/friends";
+                const isMessages = link.path === "/messages";
 
                 return (
                   <Link
@@ -298,6 +317,7 @@ export const Navbar = () => {
                   >
                     <span className="inline-flex items-center gap-2">
                       {isGifts && <Gift className="w-4 h-4" />}
+                      {isMessages && <MessageCircle className="w-4 h-4" />}
                       {link.name}
                     </span>
 
@@ -309,6 +329,11 @@ export const Navbar = () => {
                     {isFriends && isAuthenticated && friendRequestCount > 0 && (
                       <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] leading-none">
                         {friendRequestCount > 99 ? "99+" : friendRequestCount}
+                      </span>
+                    )}
+                    {isMessages && isAuthenticated && unreadMessageCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] leading-none">
+                        {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
                       </span>
                     )}
                   </Link>

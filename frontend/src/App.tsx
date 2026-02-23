@@ -28,6 +28,7 @@ import NotFound from "@/pages/NotFound";
 import ImportBook from "@/pages/ImportBook";
 import BookReader from "@/pages/BookReader";
 import GiftsInbox from "@/pages/GiftsInbox";   // ✅ NEW
+import Messages from "@/pages/Messages";
 
 import { api } from "@/lib/api";
 
@@ -121,6 +122,15 @@ const App = () => {
                     element={
                       <ProtectedRoute>
                         <BookAudio />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/messages"
+                    element={
+                      <ProtectedRoute>
+                        <Messages />
                       </ProtectedRoute>
                     }
                   />

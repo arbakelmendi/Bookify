@@ -14,12 +14,14 @@ using System.Text;
 using PersonalLibrary.Api.Modules.Recommendations;
 using PersonalLibrary.Api.Modules.Notifications;
 using PersonalLibrary.Api.Modules.Reviews;
+using PersonalLibrary.Api.Modules.Messages;
 
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Controllers + Swagger
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(c =>
@@ -82,6 +84,7 @@ builder.Services.AddScoped<CategoriesService>();
 builder.Services.AddScoped<RecommendationService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<ReviewsService>();
+builder.Services.AddScoped<MessageService>();
 
 
 // DbContext
@@ -111,6 +114,18 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
         )
+    };
+    // Allow SignalR to read token from query string
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                context.Token = accessToken;
+            return Task.CompletedTask;
+        }
     };
 });
 
@@ -187,5 +202,6 @@ app.UseAuthentication(); // ✅ MUST be before UseAuthorization
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ChatHub>("/hubs/chat");
 
 app.Run();
