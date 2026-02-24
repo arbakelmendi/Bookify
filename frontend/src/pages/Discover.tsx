@@ -1,15 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { ListFilter, X } from "lucide-react";
 import { HeroSection } from "@/components/home/HeroSection";
 import { BookSection } from "@/components/books/BookSection";
 import { getBooks } from "@/api/books";
 import type { Book } from "@/types/book";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Discover = () => {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     let active = true;
@@ -33,6 +41,26 @@ const Discover = () => {
 
   const query = (searchParams.get("q") ?? "").trim().toLowerCase();
   const categoryFilter = (searchParams.get("category") ?? "").trim().toLowerCase();
+
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>();
+    books.forEach((book) => {
+      const category = (book.category ?? "").trim();
+      if (category) set.add(category);
+    });
+
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [books]);
+
+  const applyCategoryFilter = (category: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (category && category.trim()) {
+      next.set("category", category.trim());
+    } else {
+      next.delete("category");
+    }
+    setSearchParams(next, { replace: true });
+  };
 
   const visibleBooks = useMemo(() => {
     return books.filter((book) => {
@@ -84,6 +112,68 @@ const Discover = () => {
 
         {!loading && !error && (
           <>
+            <section className="sticky top-[72px] z-20 rounded-xl border border-border/70 bg-background/90 p-3 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+              <div className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="gap-2 shrink-0">
+                      <ListFilter className="h-4 w-4" />
+                      Genres
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56">
+                    <DropdownMenuItem onClick={() => applyCategoryFilter(null)}>
+                      All categories
+                    </DropdownMenuItem>
+                    {categoryOptions.map((category) => (
+                      <DropdownMenuItem key={category} onClick={() => applyCategoryFilter(category)}>
+                        {category}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <div className="flex-1 overflow-x-auto scrollbar-hide">
+                  <div className="flex min-w-max items-center gap-2 pr-1">
+                    <Button
+                      variant={categoryFilter ? "outline" : "default"}
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => applyCategoryFilter(null)}
+                    >
+                      All
+                    </Button>
+                    {categoryOptions.map((category) => {
+                      const active = category.toLowerCase() === categoryFilter;
+                      return (
+                        <Button
+                          key={category}
+                          variant={active ? "default" : "outline"}
+                          size="sm"
+                          className="rounded-full"
+                          onClick={() => applyCategoryFilter(category)}
+                        >
+                          {category}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {categoryFilter && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={() => applyCategoryFilter(null)}
+                    title="Clear category filter"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </section>
+
             {query && visibleBooks.length === 0 && (
               <p className="text-muted-foreground">No books found for "{query}".</p>
             )}
