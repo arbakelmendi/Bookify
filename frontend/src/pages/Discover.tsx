@@ -32,15 +32,23 @@ const Discover = () => {
   }, []);
 
   const query = (searchParams.get("q") ?? "").trim().toLowerCase();
+  const categoryFilter = (searchParams.get("category") ?? "").trim().toLowerCase();
 
   const visibleBooks = useMemo(() => {
-    if (!query) return books;
     return books.filter((book) => {
+      const category = (book.category ?? "").trim().toLowerCase();
+      if (categoryFilter) {
+        const sciFiAndFantasy =
+          categoryFilter === "sci-fi" && (category === "sci-fi" || category === "fantasy");
+        if (!sciFiAndFantasy && category !== categoryFilter) return false;
+      }
+
+      if (!query) return true;
       const title = book.title.toLowerCase();
       const author = (book.author ?? "").toLowerCase();
       return title.includes(query) || author.includes(query);
     });
-  }, [books, query]);
+  }, [books, query, categoryFilter]);
 
   const trending = visibleBooks.filter((b) => b.rating >= 4.5);
   const newReleases = visibleBooks.filter((b) => b.publishedYear >= 2023);

@@ -1,15 +1,13 @@
-import { Link } from "react-router-dom";
-import { BookOpen, Github, Twitter, Instagram, Mail } from "lucide-react";
+﻿import { Link } from "react-router-dom";
+import { BookOpen, Github, Twitter, Instagram } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
 export const Footer = () => {
   return (
     <footer className="bg-card border-t border-border mt-16">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-          {/* Brand */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
           <div className="col-span-2 md:col-span-1 space-y-4">
             <Link to="/" className="flex items-center gap-2">
               <BookOpen className="w-6 h-6 text-primary" />
@@ -31,7 +29,6 @@ export const Footer = () => {
             </div>
           </div>
 
-          {/* Quick Links */}
           <div className="space-y-4">
             <h4 className="font-semibold text-foreground">Quick Links</h4>
             <ul className="space-y-2 text-sm">
@@ -58,56 +55,47 @@ export const Footer = () => {
             </ul>
           </div>
 
-          {/* Categories */}
           <div className="space-y-4">
             <h4 className="font-semibold text-foreground">Categories</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Fiction
+                <Link to="/?category=Programming" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Programming
                 </Link>
               </li>
               <li>
-                <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Non-Fiction
+                <Link to="/?category=Thriller" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Thriller
                 </Link>
               </li>
               <li>
-                <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Sci-Fi & Fantasy
+                <Link to="/?category=Self-Help" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Self-Help
                 </Link>
               </li>
               <li>
-                <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Audiobooks
+                <Link to="/?category=Mystery" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Mystery
+                </Link>
+              </li>
+              <li>
+                <Link to="/?category=Horror" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Horror
+                </Link>
+              </li>
+              <li>
+                <Link to="/?category=Classic" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Classic
                 </Link>
               </li>
             </ul>
-          </div>
-
-          {/* Newsletter */}
-          <div className="col-span-2 md:col-span-1 space-y-4">
-            <h4 className="font-semibold text-foreground">Stay Updated</h4>
-            <p className="text-sm text-muted-foreground">
-              Get notified about new releases and reading recommendations.
-            </p>
-            <div className="flex gap-2">
-              <Input 
-                type="email" 
-                placeholder="Enter your email" 
-                className="flex-1"
-              />
-              <Button size="icon">
-                <Mail className="w-4 h-4" />
-              </Button>
-            </div>
           </div>
         </div>
 
         <Separator className="my-8" />
 
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-          <p>© 2024 Bookify. All rights reserved.</p>
+          <p>© 2026 Bookify. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <Link to="/" className="hover:text-foreground transition-colors">
               Privacy Policy
