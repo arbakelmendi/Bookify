@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Search,
@@ -155,6 +155,33 @@ export const Navbar = () => {
               const isFriends = link.path === "/friends";
               const isMessages = link.path === "/messages";
 
+              if (isMessages) {
+                const messagesActive = location.pathname.startsWith("/messages");
+
+                return (
+                  <NavLink
+                    key={link.path}
+                    to="/messages"
+                    className={`relative flex items-center gap-2 px-2 py-1 text-sm transition-colors ${
+                      messagesActive
+                        ? "text-foreground font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Messages
+                    {isAuthenticated && unreadMessageCount > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] leading-none">
+                        {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
+                      </span>
+                    )}
+                    {messagesActive && (
+                      <span className="absolute -bottom-2 left-0 w-full h-[2px] bg-foreground rounded" />
+                    )}
+                  </NavLink>
+                );
+              }
+
               return (
                 <Link
                   key={link.path}
@@ -245,6 +272,11 @@ export const Navbar = () => {
                     Signed in as {user?.email}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+
+                  <DropdownMenuItem onClick={() => navigate("/profile")}>
+                    <User className="w-4 h-4 mr-2" />
+                    My Profile
+                  </DropdownMenuItem>
 
                   <DropdownMenuItem onClick={() => navigate("/gifts")}>
                     <Gift className="w-4 h-4 mr-2" />
@@ -380,6 +412,17 @@ export const Navbar = () => {
                         {user?.username}
                       </span>
                     </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        navigate("/profile");
+                        setIsOpen(false);
+                      }}
+                      className="w-full"
+                    >
+                      <User className="w-4 h-4 mr-2" />
+                      My Profile
+                    </Button>
                     <Button
                       variant="outline"
                       onClick={handleLogout}

@@ -57,7 +57,7 @@ public class AuthService
         if (!valid) return (false, "Invalid email or password.", null);
 
         var token = GenerateJwtToken(user);
-        var userDto = new UserDto(user.Id, user.Email, user.Username, user.Role);
+        var userDto = new UserDto(user.Id, user.Email, user.Username, user.Role, user.Bio);
         var response = new AuthResponseDto(token, userDto);
 
         return (true, "", response);

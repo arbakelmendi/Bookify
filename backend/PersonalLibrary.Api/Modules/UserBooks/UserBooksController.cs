@@ -152,62 +152,73 @@ public class UserBooksController : ControllerBase
 
         if (ub == null) return NotFound("Book is not in your library.");
 
+        var prevStatus = (ub.Status ?? string.Empty).Trim();
         var requested = (dto.Status ?? string.Empty).Trim().ToLowerInvariant();
-
-        if (requested is "completed" or "finished")
+        var newStatus = requested switch
         {
-            ub.Status = "Finished";
-            if (dto.TotalPages.HasValue && dto.TotalPages.Value > 0)
-            {
-                ub.TotalPages = dto.TotalPages.Value;
-            }
+            "completed" or "finished" => "Finished",
+            "planned" or "to-read" or "toread" or "to read" => "To Read",
+            _ => "Reading"
+        };
 
-            if (ub.TotalPages > 0)
+        var totalPages = ub.TotalPages;
+        if (totalPages <= 0 && dto.TotalPages.HasValue && dto.TotalPages.Value > 0)
+        {
+            totalPages = dto.TotalPages.Value;
+        }
+
+        // Apply requested status first, then adjust progress based on transition.
+        ub.Status = newStatus;
+
+        if (newStatus == "Finished")
+        {
+            if (totalPages > 0)
             {
-                ub.CurrentPage = ub.TotalPages;
-                ub.PagesRead = ub.TotalPages;
+                ub.TotalPages = totalPages;
+                ub.CurrentPage = totalPages;
+                ub.PagesRead = totalPages;
                 ub.Percent = 100;
             }
             else
             {
-                // If total pages are unknown, keep status authoritative and avoid invalid zero pages.
                 ub.CurrentPage = Math.Max(ub.CurrentPage, 1);
                 ub.PagesRead = Math.Max(ub.PagesRead, ub.CurrentPage);
                 ub.Percent = 100;
             }
         }
-        else if (requested is "planned" or "to-read" or "toread" or "to read")
+        else if (newStatus == "To Read")
         {
-            ub.Status = "To Read";
             ub.CurrentPage = 1;
             ub.PagesRead = 0;
             ub.Percent = 0;
         }
         else
         {
-            ub.Status = "Reading";
-            if (dto.TotalPages.HasValue && dto.TotalPages.Value > 0 && ub.TotalPages <= 0)
+            if (totalPages > 0)
             {
-                ub.TotalPages = dto.TotalPages.Value;
+                ub.TotalPages = totalPages;
             }
 
-            var hasExistingProgress = ub.CurrentPage > 1 || ub.PagesRead > 0 || ub.Percent > 0;
+            var prevWasFinished = prevStatus.Equals("Finished", StringComparison.OrdinalIgnoreCase) ||
+                                  prevStatus.Equals("Completed", StringComparison.OrdinalIgnoreCase);
 
-            if (!hasExistingProgress && dto.CurrentPage.HasValue && dto.CurrentPage.Value > 0)
+            if (newStatus == "Reading" && prevWasFinished && totalPages > 0)
             {
-                ub.CurrentPage = dto.CurrentPage.Value;
+                // Finished -> Reading must keep user at the last page.
+                ub.CurrentPage = totalPages;
+            }
+            else if (newStatus == "Reading" && (ub.CurrentPage <= 0))
+            {
+                ub.CurrentPage = dto.CurrentPage.HasValue && dto.CurrentPage.Value > 0
+                    ? dto.CurrentPage.Value
+                    : 1;
             }
 
-            if (ub.CurrentPage <= 0)
+            if (totalPages > 0)
             {
-                ub.CurrentPage = 1;
-            }
-
-            if (ub.TotalPages > 0)
-            {
-                ub.CurrentPage = Math.Clamp(ub.CurrentPage, 1, ub.TotalPages);
-                ub.PagesRead = Math.Clamp(ub.CurrentPage, 0, ub.TotalPages);
-                ub.Percent = Math.Max(1, Math.Round((ub.PagesRead * 100.0) / ub.TotalPages));
+                ub.CurrentPage = Math.Clamp(ub.CurrentPage, 1, totalPages);
+                ub.PagesRead = Math.Clamp(Math.Max(ub.PagesRead, ub.CurrentPage), 0, totalPages);
+                ub.Percent = Math.Max(0, Math.Round((ub.PagesRead * 100.0) / totalPages));
             }
             else
             {
@@ -219,7 +230,33 @@ public class UserBooksController : ControllerBase
         ub.LastUpdated = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
-        return NoContent();
+        var updated = await _db.UserBooks
+            .AsNoTracking()
+            .Include(x => x.Book)
+            .Where(x => x.UserId == userId && x.BookId == bookId)
+            .Select(x => new UserBookDto
+            {
+                Id = x.Id,
+                UserId = x.UserId,
+                BookId = x.BookId,
+                Status = x.Status,
+                CurrentPage = x.CurrentPage,
+                PagesRead = x.PagesRead,
+                TotalPages = x.TotalPages,
+                Percent = x.Percent,
+                LastUpdated = x.LastUpdated,
+                Title = x.Book!.Title,
+                Author = x.Book.Author,
+                Description = x.Book.Description,
+                CoverImageUrl = x.Book.CoverImageUrl,
+                Year = x.Book.Year
+            })
+            .FirstOrDefaultAsync();
+
+        if (updated == null)
+            return NotFound("Book is not in your library.");
+
+        return Ok(updated);
     }
 
     // DELETE: /api/UserBooks/book/{bookId}

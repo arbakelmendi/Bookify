@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,8 @@ function normalizeStatus(raw?: unknown) {
   return String(raw ?? "")
     .trim()
     .toLowerCase()
-    .replace(/\s|_/g, "-");
+    .replace(/_/g, "-")
+    .replace(/\s+/g, "-");
 }
 
 const Library = () => {
@@ -24,15 +25,11 @@ const Library = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const searchQuery = searchParams.get("q") ?? "";
-
-  const parsedFilter = normalizeStatus(searchParams.get("filter") || "all");
-  const activeFilter: ReadingStatus | "all" =
-    parsedFilter === "reading" ||
-    parsedFilter === "to-read" ||
-    parsedFilter === "finished" ||
-    parsedFilter === "all"
-      ? (parsedFilter as ReadingStatus | "all")
-      : "all";
+  const filter = normalizeStatus(searchParams.get("filter") || "all");
+  const prevFilterRef = useRef<string>(filter);
+  const firstReadingRef = useRef<HTMLDivElement | null>(null);
+  const lastReadingRef = useRef<HTMLDivElement | null>(null);
+  const pendingScrollRef = useRef<"first-reading" | "last-reading" | null>(null);
 
   const load = async (activeRef?: { current: boolean }) => {
     try {
@@ -40,14 +37,6 @@ const Library = () => {
       const data = await getMyLibrary();
       if (!activeRef || activeRef.current) {
         setBooks(data);
-        console.log("LIBRARY RAW", (data ?? []).slice(0, 5));
-        console.log(
-          "STATUSES",
-          (data ?? []).map((x) => {
-            const raw = x as UserBook & { readingStatus?: string; reading_status?: string };
-            return raw.status ?? raw.readingStatus ?? raw.reading_status;
-          })
-        );
       }
     } catch (e) {
       if (!activeRef || activeRef.current) {
@@ -66,13 +55,6 @@ const Library = () => {
     };
   }, []);
 
-  const filters: { label: string; value: ReadingStatus | "all" }[] = [
-    { label: "All Books", value: "all" },
-    { label: "Reading", value: "reading" },
-    { label: "To Read", value: "to-read" },
-    { label: "Finished", value: "finished" },
-  ];
-
   const updateParams = (patch: Record<string, string | null | undefined>) => {
     setSearchParams(
       (prev) => {
@@ -87,69 +69,73 @@ const Library = () => {
     );
   };
 
+  const setFilter = (next: string) => {
+    const sp = new URLSearchParams(searchParams);
+    if (!next || next === "all") sp.delete("filter");
+    else sp.set("filter", next);
+    if (next !== "reading") {
+      pendingScrollRef.current = null;
+    }
+    setSearchParams(sp, { replace: true });
+  };
+
+  const handleReadingClick = () => {
+    const prev = prevFilterRef.current;
+
+    if (prev === "finished") pendingScrollRef.current = "last-reading";
+    else if (prev === "to-read") pendingScrollRef.current = "first-reading";
+    else pendingScrollRef.current = "first-reading";
+
+    setFilter("reading");
+  };
+
   useEffect(() => {
-    console.log("FILTER URL", searchParams.toString(), "activeFilter", activeFilter);
-  }, [searchParams, activeFilter]);
+    prevFilterRef.current = filter;
+  }, [filter]);
 
-  const normalizedItems = useMemo(() => {
-    return books.map((x) => {
-      const raw = x as UserBook & {
-        readingStatus?: string;
-        reading_status?: string;
-        reading_state?: string;
-        total_pages?: number;
-        pages?: number;
-        current_page?: number;
-        page?: number;
-      };
-      const statusRaw =
-        raw.status ?? raw.readingStatus ?? raw.reading_status ?? raw.reading_state ?? "";
-      const status = normalizeStatus(statusRaw);
-
-      const totalPages = Number(raw.totalPages ?? raw.total_pages ?? raw.pages ?? 0) || 0;
-      const currentPage = Number(raw.currentPage ?? raw.current_page ?? raw.page ?? 0) || 0;
-
-      const isFinished = status === "finished" || (totalPages > 0 && currentPage >= totalPages);
-      const isToRead = status === "to-read" || status === "toread" || (!isFinished && currentPage <= 1);
-      const isReading = status === "reading" || (!isFinished && currentPage > 1);
-
-      return {
-        ...raw,
-        _status: status,
-        _isFinished: isFinished,
-        _isToRead: isToRead,
-        _isReading: isReading,
-        _totalPages: totalPages,
-        _currentPage: currentPage,
-      } as UserBook & {
-        _status: string;
-        _isFinished: boolean;
-        _isToRead: boolean;
-        _isReading: boolean;
-        _totalPages: number;
-        _currentPage: number;
-      };
-    });
+  const readingBooks = useMemo(() => {
+    return books.filter((book) => normalizeStatus(book.status) === "reading");
   }, [books]);
 
-  const filteredItems = useMemo(() => {
-    return normalizedItems.filter((book) => {
+  const filteredBooks = useMemo(() => {
+    return books.filter((book) => {
       const matchesSearch =
         book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         book.author.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchesFilter =
-        activeFilter === "all"
-          ? true
-          : activeFilter === "finished"
-          ? book._isFinished
-          : activeFilter === "to-read"
-          ? book._isToRead
-          : book._isReading;
+      const matchesFilter = filter === "all" ? true : normalizeStatus(book.status) === filter;
 
       return matchesSearch && matchesFilter;
     });
-  }, [activeFilter, normalizedItems, searchQuery]);
+  }, [books, filter, searchQuery]);
+
+  useEffect(() => {
+    if (filter !== "reading") return;
+
+    const intent = pendingScrollRef.current;
+    if (!intent) return;
+
+    const raf = window.requestAnimationFrame(() => {
+      if (readingBooks.length === 0) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        pendingScrollRef.current = null;
+        return;
+      }
+
+      const el =
+        intent === "last-reading" ? lastReadingRef.current : firstReadingRef.current;
+
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      pendingScrollRef.current = null;
+    });
+
+    return () => window.cancelAnimationFrame(raf);
+  }, [filter, filteredBooks.length, readingBooks.length]);
 
   const handleStatusChange = async (id: string, status: ReadingStatus) => {
     const currentBook = books.find((book) => book.id === id);
@@ -267,41 +253,70 @@ const Library = () => {
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
-            {filters.map((filter) => (
-              <Button
-                key={filter.value}
-                variant={activeFilter === filter.value ? "default" : "outline"}
-                size="sm"
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log("TAB CLICK", filter.value);
-                  updateParams({ filter: filter.value });
-                }}
-                className="flex-shrink-0"
-              >
-                {filter.label}
-              </Button>
-            ))}
+            <Button
+              variant={filter === "all" ? "default" : "outline"}
+              size="sm"
+              type="button"
+              onClick={() => setFilter("all")}
+              className="flex-shrink-0"
+            >
+              All Books
+            </Button>
+            <Button
+              variant={filter === "reading" ? "default" : "outline"}
+              size="sm"
+              type="button"
+              onClick={handleReadingClick}
+              className="flex-shrink-0"
+            >
+              Reading
+            </Button>
+            <Button
+              variant={filter === "to-read" ? "default" : "outline"}
+              size="sm"
+              type="button"
+              onClick={() => setFilter("to-read")}
+              className="flex-shrink-0"
+            >
+              To Read
+            </Button>
+            <Button
+              variant={filter === "finished" ? "default" : "outline"}
+              size="sm"
+              type="button"
+              onClick={() => setFilter("finished")}
+              className="flex-shrink-0"
+            >
+              Finished
+            </Button>
           </div>
         </motion.div>
 
         {error && <p className="text-destructive mb-4">{error}</p>}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
-          {filteredItems.map((book, index) => (
-            <LibraryCard
-              key={book.id}
-              book={book}
-              index={index}
-              onStatusChange={handleStatusChange}
-              onRemove={handleRemove}
-            />
-          ))}
+          {filteredBooks.map((book, index) => {
+            const isReadingView = filter === "reading";
+            const isFirst = isReadingView && index === 0;
+            const isLast = isReadingView && index === filteredBooks.length - 1;
+
+            return (
+              <div
+                key={book.id}
+                ref={isFirst ? firstReadingRef : isLast ? lastReadingRef : undefined}
+              >
+                <LibraryCard
+                  book={book}
+                  index={index}
+                  onStatusChange={handleStatusChange}
+                  onRemove={handleRemove}
+                />
+              </div>
+            );
+          })}
         </div>
 
-        {filteredItems.length === 0 && (
+        {filteredBooks.length === 0 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
             <p className="text-muted-foreground">No books found</p>
           </motion.div>

@@ -29,6 +29,23 @@ export interface FriendStats {
   reviews: number;
 }
 
+export interface FriendMini {
+  id: number;
+  email: string;
+  username: string;
+}
+
+export interface FriendReview {
+  id: number;
+  bookId: number;
+  bookTitle: string;
+  coverImageUrl: string;
+  text: string;
+  rating: number;
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
 export const friendsApi = {
   incoming: () => api.get("/api/Friends/incoming").then(r => r.data),
   incomingCount: () => api.get("/api/Friends/requests/incoming/count").then(r => r.data as { count: number }),
@@ -49,6 +66,10 @@ export const friendsApi = {
         reviews: data.reviews ?? 0,
       } satisfies FriendStats;
     }),
+  getFriendFriends: (friendId: number) =>
+    api.get(`/api/Friends/${friendId}/friends`).then((r) => r.data as FriendMini[]),
+  getFriendReviews: (friendId: number) =>
+    api.get(`/api/Friends/${friendId}/reviews`).then((r) => r.data as FriendReview[]),
 
   sendRequest: (receiverId: number) =>
     api.post("/api/Friends/request", { receiverId }).then(r => r.data),

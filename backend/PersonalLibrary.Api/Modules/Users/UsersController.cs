@@ -88,7 +88,7 @@ public class UsersController : ControllerBase
         var users = await _context.Users
             .AsNoTracking()
             .OrderBy(u => u.Id)
-            .Select(u => new UserDto(u.Id, u.Email, u.Username, u.Role))
+            .Select(u => new UserDto(u.Id, u.Email, u.Username, u.Role, u.Bio))
             .ToListAsync();
 
         return Ok(users);
@@ -105,7 +105,7 @@ public class UsersController : ControllerBase
 
         if (user == null) return NotFound(new { message = "User not found." });
 
-        return Ok(new UserDto(user.Id, user.Email, user.Username, user.Role));
+        return Ok(new UserDto(user.Id, user.Email, user.Username, user.Role, user.Bio));
     }
 
     // Admin only: update user
@@ -135,6 +135,24 @@ public class UsersController : ControllerBase
 
         await _context.SaveChangesAsync();
         return NoContent();
+    }
+
+    // Authenticated: update own bio
+    // PUT /api/Users/me/bio
+    [HttpPut("me/bio")]
+    public async Task<ActionResult<UserDto>> UpdateMyBio([FromBody] UpdateBioDto dto)
+    {
+        var meClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(meClaim, out var meId))
+            return Unauthorized(new { message = "Invalid user id claim." });
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == meId);
+        if (user == null) return NotFound(new { message = "User not found." });
+
+        user.Bio = (dto.Bio ?? "").Trim();
+        await _context.SaveChangesAsync();
+
+        return Ok(new UserDto(user.Id, user.Email, user.Username, user.Role, user.Bio));
     }
 
     // Admin only: delete user

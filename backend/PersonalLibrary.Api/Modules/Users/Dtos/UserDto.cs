@@ -1,3 +1,3 @@
 namespace PersonalLibrary.Api.Modules.Users.Dtos;
 
-public record UserDto(int Id, string Email, string Username, string Role);
+public record UserDto(int Id, string Email, string Username, string Role, string? Bio);

@@ -82,12 +82,12 @@ export function mapApiUserBookToUserBook(x: ApiUserBookMaybeNested): UserBook {
   const resolvedStatus: UserBook["status"] =
     statusFromApi === "finished"
       ? "finished"
-      : totalPages > 0 && currentPage >= totalPages
-        ? "finished"
-        : statusFromApi === "to-read"
-          ? "to-read"
-          : statusFromApi === "reading"
-            ? "reading"
+      : statusFromApi === "to-read"
+        ? "to-read"
+        : statusFromApi === "reading"
+          ? "reading"
+          : totalPages > 0 && currentPage >= totalPages
+            ? "finished"
             : currentPage > 1
               ? "reading"
               : "to-read";

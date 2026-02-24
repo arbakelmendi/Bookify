@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PersonalLibrary.Api.Data;
 using PersonalLibrary.Api.Modules.Auth.Dtos;
 using PersonalLibrary.Api.Modules.Users.Dtos;
 
@@ -11,10 +13,12 @@ namespace PersonalLibrary.Api.Modules.Auth;
 public class AuthController : ControllerBase
 {
     private readonly AuthService _service;
+    private readonly AppDbContext _context;
 
-    public AuthController(AuthService service)
+    public AuthController(AuthService service, AppDbContext context)
     {
         _service = service;
+        _context = context;
     }
 
     [HttpPost("register")]
@@ -38,7 +42,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpGet("me")]
-    public IActionResult GetCurrentUser()
+    public async Task<IActionResult> GetCurrentUser()
     {
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var email = User.FindFirst(ClaimTypes.Email)?.Value;
@@ -47,11 +51,18 @@ public class AuthController : ControllerBase
 
         if (userId == null || email == null || username == null || role == null)
         {
-            var guestUser = new UserDto(0, "guest@bookify.local", "guest", "user");
+            var guestUser = new UserDto(0, "guest@bookify.local", "guest", "user", null);
             return Ok(guestUser);
         }
 
-        var userDto = new UserDto(int.Parse(userId), email, username, role);
+        var parsedUserId = int.Parse(userId);
+        var userBio = await _context.Users
+            .AsNoTracking()
+            .Where(u => u.Id == parsedUserId)
+            .Select(u => u.Bio)
+            .FirstOrDefaultAsync();
+
+        var userDto = new UserDto(parsedUserId, email, username, role, userBio);
         return Ok(userDto);
     }
 }

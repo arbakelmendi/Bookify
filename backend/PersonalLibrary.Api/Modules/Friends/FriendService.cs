@@ -307,14 +307,8 @@ public class FriendService
     // ✅ Get a friend's library (books only, no progress details)
     public async Task<(bool ok, string error, List<FriendLibraryBookDto>? books)> GetFriendLibraryAsync(int userId, int friendId)
     {
-        var areFriends = await _context.FriendRequests
-            .AsNoTracking()
-            .AnyAsync(fr =>
-                fr.Status == FriendRequestStatuses.Accepted &&
-                ((fr.SenderId == userId && fr.ReceiverId == friendId) ||
-                 (fr.SenderId == friendId && fr.ReceiverId == userId)));
-
-        if (!areFriends)
+        var canAccess = await CanAccessFriendDataAsync(userId, friendId);
+        if (!canAccess)
             return (false, "You are not friends with this user.", null);
 
         var books = await _context.UserBooks
@@ -337,14 +331,8 @@ public class FriendService
 
     public async Task<(bool ok, string error, FriendStatsDto? data)> GetFriendStatsAsync(int userId, int friendId)
     {
-        var areFriends = await _context.FriendRequests
-            .AsNoTracking()
-            .AnyAsync(fr =>
-                fr.Status == FriendRequestStatuses.Accepted &&
-                ((fr.SenderId == userId && fr.ReceiverId == friendId) ||
-                 (fr.SenderId == friendId && fr.ReceiverId == userId)));
-
-        if (!areFriends)
+        var canAccess = await CanAccessFriendDataAsync(userId, friendId);
+        if (!canAccess)
             return (false, "You are not friends with this user.", null);
 
         var friendConnections = await _context.FriendRequests
@@ -367,6 +355,79 @@ public class FriendService
         };
 
         return (true, "", dto);
+    }
+
+    public async Task<(bool ok, string error, List<FriendMiniDto>? data)> GetFriendFriendsAsync(int userId, int friendId)
+    {
+        var canAccess = await CanAccessFriendDataAsync(userId, friendId);
+        if (!canAccess)
+            return (false, "You are not friends with this user.", null);
+
+        var friendIds = await _context.FriendRequests
+            .AsNoTracking()
+            .Where(fr => fr.Status == FriendRequestStatuses.Accepted &&
+                         (fr.SenderId == friendId || fr.ReceiverId == friendId))
+            .Select(fr => fr.SenderId == friendId ? fr.ReceiverId : fr.SenderId)
+            .Distinct()
+            .ToListAsync();
+
+        if (friendIds.Count == 0)
+            return (true, "", new List<FriendMiniDto>());
+
+        var friends = await _context.Users
+            .AsNoTracking()
+            .Where(u => friendIds.Contains(u.Id))
+            .OrderBy(u => u.Username)
+            .ThenBy(u => u.Email)
+            .Select(u => new FriendMiniDto(u.Id, u.Email, u.Username))
+            .ToListAsync();
+
+        return (true, "", friends);
+    }
+
+    public async Task<(bool ok, string error, List<FriendReviewDto>? data)> GetFriendReviewsAsync(int userId, int friendId)
+    {
+        var canAccess = await CanAccessFriendDataAsync(userId, friendId);
+        if (!canAccess)
+            return (false, "You are not friends with this user.", null);
+
+        var ratingsForFriend = _context.BookRatings
+            .AsNoTracking()
+            .Where(br => br.UserId == friendId);
+
+        var reviews = await (
+            from r in _context.BookReviews.AsNoTracking()
+            join b in _context.Books.AsNoTracking() on r.BookId equals b.Id
+            join br in ratingsForFriend on r.BookId equals br.BookId into ratingsJoin
+            from rating in ratingsJoin.DefaultIfEmpty()
+            where r.UserId == friendId
+            orderby (r.UpdatedAt ?? r.CreatedAt) descending
+            select new FriendReviewDto(
+                r.Id,
+                r.BookId,
+                b.Title,
+                b.CoverImageUrl,
+                r.Text,
+                rating != null ? rating.Value : 0,
+                r.CreatedAt,
+                r.UpdatedAt
+            )
+        ).ToListAsync();
+
+        return (true, "", reviews);
+    }
+
+    private async Task<bool> CanAccessFriendDataAsync(int userId, int friendId)
+    {
+        if (userId == friendId)
+            return true;
+
+        return await _context.FriendRequests
+            .AsNoTracking()
+            .AnyAsync(fr =>
+                fr.Status == FriendRequestStatuses.Accepted &&
+                ((fr.SenderId == userId && fr.ReceiverId == friendId) ||
+                 (fr.SenderId == friendId && fr.ReceiverId == userId)));
     }
 
     // ✅ Remove friend (deletes accepted relationship)

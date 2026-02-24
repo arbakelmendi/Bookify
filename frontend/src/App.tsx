@@ -24,6 +24,7 @@ import Admin from "@/pages/Admin";
 import BookDetail from "@/pages/BookDetail";
 import BookAudio from "@/pages/BookAudio";
 import FriendProfile from "@/pages/FriendProfile";
+import MyProfile from "@/pages/MyProfile";
 import NotFound from "@/pages/NotFound";
 import ImportBook from "@/pages/ImportBook";
 import BookReader from "@/pages/BookReader";
@@ -133,6 +134,15 @@ const AppShell = () => {
             element={
               <ProtectedRoute>
                 <FriendProfile />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <MyProfile />
               </ProtectedRoute>
             }
           />

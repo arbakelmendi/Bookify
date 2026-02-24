@@ -187,6 +187,42 @@ public class FriendsController : ControllerBase
         return Ok(data);
     }
 
+    // GET: /api/Friends/{friendId}/friends
+    [HttpGet("{friendId:int}/friends")]
+    public async Task<IActionResult> GetFriendFriends(int friendId)
+    {
+        var userId = GetUserId();
+        var (ok, error, data) = await _service.GetFriendFriendsAsync(userId, friendId);
+
+        if (!ok)
+        {
+            if (error.Contains("not friends", StringComparison.OrdinalIgnoreCase))
+                return Forbid();
+
+            return BadRequest(new { message = error });
+        }
+
+        return Ok(data);
+    }
+
+    // GET: /api/Friends/{friendId}/reviews
+    [HttpGet("{friendId:int}/reviews")]
+    public async Task<IActionResult> GetFriendReviews(int friendId)
+    {
+        var userId = GetUserId();
+        var (ok, error, data) = await _service.GetFriendReviewsAsync(userId, friendId);
+
+        if (!ok)
+        {
+            if (error.Contains("not friends", StringComparison.OrdinalIgnoreCase))
+                return Forbid();
+
+            return BadRequest(new { message = error });
+        }
+
+        return Ok(data);
+    }
+
     // DELETE: /api/Friends/remove/{friendId}
     [HttpDelete("remove/{friendId:int}")]
     public async Task<IActionResult> RemoveFriend(int friendId)

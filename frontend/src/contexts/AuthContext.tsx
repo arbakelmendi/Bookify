@@ -7,6 +7,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   loading: boolean;
+  refreshMe: () => Promise<void>;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signup: (username: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
@@ -21,27 +22,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Restore session on mount if token exists
   useEffect(() => {
     const restoreSession = async () => {
-      const token = getStoredToken();
-
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const currentUser = await getCurrentUser();
-        setUser(currentUser);
-      } catch (error) {
-        console.error("Failed to restore session:", error);
-        // Token is invalid or expired, clear it
-        apiLogoutUser();
-      } finally {
-        setLoading(false);
-      }
+      await refreshMe();
     };
 
     restoreSession();
   }, []);
+
+  const refreshMe = async () => {
+    const token = getStoredToken();
+
+    if (!token) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const currentUser = await getCurrentUser();
+      setUser(currentUser);
+    } catch (error) {
+      console.error("Failed to restore session:", error);
+      // Token is invalid or expired, clear it
+      apiLogoutUser();
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -91,6 +98,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isAuthenticated: !!user,
         isAdmin: user?.role === "admin",
         loading,
+        refreshMe,
         login,
         signup,
         logout

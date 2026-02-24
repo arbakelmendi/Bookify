@@ -10,6 +10,8 @@ public class User
 
     public string Role { get; set; } = "user";
 
+    public string? Bio { get; set; }
+
      // Store hashed password (NOT plain text)
     public string PasswordHash { get; set; } = string.Empty;
 }

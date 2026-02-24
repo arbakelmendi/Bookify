@@ -1,16 +1,15 @@
-// frontend/src/api/users.ts
-import { apiGet } from "./client";
-
-export type UserSearchItem = {
-  id: number;
-  username: string;
-  email?: string | null;
-};
+import { api } from "@/lib/api";
+import type { User } from "@/types/auth";
 
 export const usersApi = {
   search: (q: string) =>
-    apiGet<UserSearchItem[]>(`/api/Users/search`, { q }),
-
-  getById: (id: number) =>
-    apiGet<UserSearchItem>(`/api/Users/${id}`),
+    api.get("/api/Users/search", { params: { q } }).then((r) => r.data),
 };
+
+export async function getUserById(id: number) {
+  return api.get(`/api/Users/${id}`).then((r) => r.data as User);
+}
+
+export async function updateMyBio(bio: string) {
+  return api.put("/api/Users/me/bio", { bio }).then((r) => r.data as User);
+}
