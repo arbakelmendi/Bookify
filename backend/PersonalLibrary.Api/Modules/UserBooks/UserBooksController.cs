@@ -157,6 +157,11 @@ public class UserBooksController : ControllerBase
         if (requested is "completed" or "finished")
         {
             ub.Status = "Finished";
+            if (dto.TotalPages.HasValue && dto.TotalPages.Value > 0)
+            {
+                ub.TotalPages = dto.TotalPages.Value;
+            }
+
             if (ub.TotalPages > 0)
             {
                 ub.CurrentPage = ub.TotalPages;
@@ -165,7 +170,9 @@ public class UserBooksController : ControllerBase
             }
             else
             {
-                // If total pages are unknown, keep status authoritative.
+                // If total pages are unknown, keep status authoritative and avoid invalid zero pages.
+                ub.CurrentPage = Math.Max(ub.CurrentPage, 1);
+                ub.PagesRead = Math.Max(ub.PagesRead, ub.CurrentPage);
                 ub.Percent = 100;
             }
         }
@@ -179,11 +186,33 @@ public class UserBooksController : ControllerBase
         else
         {
             ub.Status = "Reading";
+            if (dto.TotalPages.HasValue && dto.TotalPages.Value > 0 && ub.TotalPages <= 0)
+            {
+                ub.TotalPages = dto.TotalPages.Value;
+            }
+
+            var hasExistingProgress = ub.CurrentPage > 1 || ub.PagesRead > 0 || ub.Percent > 0;
+
+            if (!hasExistingProgress && dto.CurrentPage.HasValue && dto.CurrentPage.Value > 0)
+            {
+                ub.CurrentPage = dto.CurrentPage.Value;
+            }
+
+            if (ub.CurrentPage <= 0)
+            {
+                ub.CurrentPage = 1;
+            }
+
             if (ub.TotalPages > 0)
             {
                 ub.CurrentPage = Math.Clamp(ub.CurrentPage, 1, ub.TotalPages);
                 ub.PagesRead = Math.Clamp(ub.CurrentPage, 0, ub.TotalPages);
-                ub.Percent = (ub.PagesRead * 100.0) / ub.TotalPages;
+                ub.Percent = Math.Max(1, Math.Round((ub.PagesRead * 100.0) / ub.TotalPages));
+            }
+            else
+            {
+                ub.PagesRead = Math.Max(ub.PagesRead, 0);
+                ub.Percent = Math.Max(ub.Percent, 0);
             }
         }
 

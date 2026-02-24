@@ -29,6 +29,25 @@ public class MessagesController : ControllerBase
         return Ok(conversations);
     }
 
+    // POST /api/Messages/with/{friendId}
+    [HttpPost("with/{friendId:int}")]
+    public async Task<IActionResult> EnsureConversation(int friendId)
+    {
+        var userId = GetUserId();
+        var (ok, error, conversation) = await _service.EnsureConversationAsync(userId, friendId);
+
+        if (!ok)
+        {
+            if (error.Contains("not friends", StringComparison.OrdinalIgnoreCase))
+                return Forbid();
+            if (error.Contains("not found", StringComparison.OrdinalIgnoreCase))
+                return NotFound(new { message = error });
+            return BadRequest(new { message = error });
+        }
+
+        return Ok(conversation);
+    }
+
     // GET /api/Messages/{friendId}?page=1
     [HttpGet("{friendId:int}")]
     public async Task<IActionResult> GetMessages(int friendId, [FromQuery] int page = 1)

@@ -6,4 +6,7 @@ public class UpdateUserBookStatusDto
 {
     [Required]
     public string Status { get; set; } = "Reading";
+
+    public int? TotalPages { get; set; }
+    public int? CurrentPage { get; set; }
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Document, Page, pdfjs } from "react-pdf";
 import { getBookById } from "@/api/books";
-import { getPdfProgress, upsertPdfProgress } from "@/api/reading";
+import { getPdfProgress, upsertPdfProgress, type PdfProgressViewDto } from "@/api/reading";
 import type { Book } from "@/types/book";
 import { Button } from "@/components/ui/button";
 import {
@@ -177,11 +177,17 @@ export default function BookReader() {
       if (!force && key === lastSavedKeyRef.current) return;
 
       try {
-        await upsertPdfProgress(bookId, {
+        const result = await upsertPdfProgress(bookId, {
           currentPage: page,
           totalPages: total,
           status: "Reading",
         });
+        const progress = result as PdfProgressViewDto | void;
+        const savedPage =
+          progress && typeof progress.currentPage === "number"
+            ? clampPage(progress.currentPage, progress.totalPages || total)
+            : page;
+        latestPageRef.current = savedPage;
         lastSavedKeyRef.current = key;
       } catch {
         // Best effort save.
@@ -385,7 +391,7 @@ export default function BookReader() {
   }
 
   const safeFileName =
-    (book.title || `book-${id}`).replace(/[^\w\-]+/g, "_") + ".pdf";
+    (book.title || `book-${id}`).replace(/[^\w-]+/g, "_") + ".pdf";
 
   return (
     <div className="min-h-screen">

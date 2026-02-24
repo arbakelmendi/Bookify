@@ -49,7 +49,7 @@ function uiStatusToApi(status: UserBook["status"]): string {
 }
 
 export function mapApiUserBookToUserBook(x: ApiUserBookMaybeNested): UserBook {
-  const b = x.book ?? ({} as any);
+  const b = x.book ?? {};
 
   const title = x.title ?? b.title ?? "Untitled";
   const author = x.author ?? b.author ?? "Unknown author";
@@ -118,8 +118,17 @@ export async function addToLibrary(bookId: number, status: UserBook["status"] = 
 }
 
 // ✅ update status persisted
-export async function updateLibraryStatus(bookId: number, status: UserBook["status"]) {
-  return apiPut(`/api/UserBooks/book/${bookId}/status`, { status: uiStatusToApi(status) });
+export async function updateLibraryStatus(
+  bookId: number,
+  status: UserBook["status"],
+  totalPages?: number,
+  currentPage?: number
+) {
+  return apiPut(`/api/UserBooks/book/${bookId}/status`, {
+    status: uiStatusToApi(status),
+    ...(typeof totalPages === "number" && totalPages > 0 ? { totalPages } : {}),
+    ...(typeof currentPage === "number" && currentPage > 0 ? { currentPage } : {}),
+  });
 }
 
 // ✅ remove from library

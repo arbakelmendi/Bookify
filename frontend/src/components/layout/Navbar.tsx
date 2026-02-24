@@ -99,11 +99,16 @@ export const Navbar = () => {
     const onFriendRefresh = () => {
       void load();
     };
+    const onMessagesRefresh = () => {
+      void load();
+    };
     window.addEventListener("friends:incoming-count-refresh", onFriendRefresh);
+    window.addEventListener("messages:unread-count-refresh", onMessagesRefresh);
     const t = window.setInterval(load, 15000); // refresh every 15s
     return () => {
       active = false;
       window.removeEventListener("friends:incoming-count-refresh", onFriendRefresh);
+      window.removeEventListener("messages:unread-count-refresh", onMessagesRefresh);
       window.clearInterval(t);
     };
   }, [isAuthenticated]);

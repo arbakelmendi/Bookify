@@ -119,6 +119,14 @@ const AppShell = () => {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/messages/:friendId"
+            element={
+              <ProtectedRoute>
+                <Messages />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/friend/:id"

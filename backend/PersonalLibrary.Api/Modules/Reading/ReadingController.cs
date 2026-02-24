@@ -106,7 +106,7 @@ public class ReadingController : ControllerBase
             return CreatedAtAction(nameof(GetPdfProgress), new { bookId }, result.dto);
         }
 
-        return NoContent();
+        return Ok(result.dto);
     }
 
     /* ================= MARK FINISHED ================= */

@@ -43,7 +43,10 @@ const Library = () => {
         console.log("LIBRARY RAW", (data ?? []).slice(0, 5));
         console.log(
           "STATUSES",
-          (data ?? []).map((x: any) => x?.status ?? x?.readingStatus ?? x?.reading_status)
+          (data ?? []).map((x) => {
+            const raw = x as UserBook & { readingStatus?: string; reading_status?: string };
+            return raw.status ?? raw.readingStatus ?? raw.reading_status;
+          })
         );
       }
     } catch (e) {
@@ -89,20 +92,29 @@ const Library = () => {
   }, [searchParams, activeFilter]);
 
   const normalizedItems = useMemo(() => {
-    return books.map((x: any) => {
+    return books.map((x) => {
+      const raw = x as UserBook & {
+        readingStatus?: string;
+        reading_status?: string;
+        reading_state?: string;
+        total_pages?: number;
+        pages?: number;
+        current_page?: number;
+        page?: number;
+      };
       const statusRaw =
-        x?.status ?? x?.readingStatus ?? x?.reading_status ?? x?.reading_state ?? "";
+        raw.status ?? raw.readingStatus ?? raw.reading_status ?? raw.reading_state ?? "";
       const status = normalizeStatus(statusRaw);
 
-      const totalPages = Number(x?.totalPages ?? x?.total_pages ?? x?.pages ?? 0) || 0;
-      const currentPage = Number(x?.currentPage ?? x?.current_page ?? x?.page ?? 0) || 0;
+      const totalPages = Number(raw.totalPages ?? raw.total_pages ?? raw.pages ?? 0) || 0;
+      const currentPage = Number(raw.currentPage ?? raw.current_page ?? raw.page ?? 0) || 0;
 
       const isFinished = status === "finished" || (totalPages > 0 && currentPage >= totalPages);
       const isToRead = status === "to-read" || status === "toread" || (!isFinished && currentPage <= 1);
       const isReading = status === "reading" || (!isFinished && currentPage > 1);
 
       return {
-        ...x,
+        ...raw,
         _status: status,
         _isFinished: isFinished,
         _isToRead: isToRead,
@@ -140,6 +152,17 @@ const Library = () => {
   }, [activeFilter, normalizedItems, searchQuery]);
 
   const handleStatusChange = async (id: string, status: ReadingStatus) => {
+    const currentBook = books.find((book) => book.id === id);
+    const bookTotalPages = currentBook ? Math.max(0, currentBook.totalPages ?? currentBook.pages ?? 0) : 0;
+    const hasProgress = currentBook
+      ? (currentBook.currentPage ?? 0) > 1 || (currentBook.pagesRead ?? 0) > 0 || (currentBook.percent ?? 0) > 0
+      : false;
+
+    const totalPagesForRequest =
+      (status === "finished" || status === "reading") && bookTotalPages > 0 ? bookTotalPages : undefined;
+    const currentPageForReading =
+      status === "reading" && !hasProgress ? 1 : undefined;
+
     setBooks((prev) =>
       prev.map((book) =>
         book.id === id
@@ -148,25 +171,43 @@ const Library = () => {
               status,
               currentPage:
                 status === "finished"
-                  ? Math.max(1, book.totalPages ?? 1)
+                  ? (book.totalPages ?? 0) > 0
+                    ? book.totalPages
+                    : Math.max(1, book.currentPage ?? 1)
                   : status === "to-read"
                   ? 1
-                  : Math.max(2, book.currentPage ?? 2),
+                  : book.status === "finished" && !hasProgress
+                  ? 1
+                  : Math.max(1, book.currentPage ?? 1),
               pagesRead:
                 status === "finished"
-                  ? Math.max(1, book.totalPages ?? 1)
+                  ? (book.totalPages ?? 0) > 0
+                    ? book.totalPages
+                    : Math.max(1, book.pagesRead ?? book.currentPage ?? 1)
                   : status === "to-read"
                   ? 0
-                  : Math.max(2, book.pagesRead ?? 2),
+                  : !hasProgress
+                  ? 0
+                  : Math.max(0, book.pagesRead ?? 0),
               percent:
                 status === "finished"
                   ? 100
                   : status === "to-read"
                   ? 0
-                  : book.totalPages && book.totalPages > 0
-                  ? Math.min(99, Math.round((Math.max(2, book.currentPage ?? 2) * 100) / book.totalPages))
-                  : book.percent,
-              progress: status === "finished" ? 100 : status === "to-read" ? 0 : book.progress,
+                  : (() => {
+                      const total = Math.max(0, book.totalPages ?? book.pages ?? 0);
+                      if (total > 0) {
+                        const basePage = !hasProgress ? 1 : Math.max(1, book.currentPage ?? 1);
+                        return Math.max(1, Math.min(99, Math.round((basePage * 100) / total)));
+                      }
+                      return !hasProgress ? Math.max(0, book.percent ?? 0) : book.percent;
+                    })(),
+              progress:
+                status === "finished"
+                  ? 100
+                  : status === "to-read"
+                  ? 0
+                  : book.progress,
             }
           : book
       )
@@ -174,7 +215,7 @@ const Library = () => {
 
     try {
       const bookId = Number(id);
-      await updateLibraryStatus(bookId, status);
+      await updateLibraryStatus(bookId, status, totalPagesForRequest, currentPageForReading);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update status.");

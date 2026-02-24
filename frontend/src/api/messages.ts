@@ -18,9 +18,18 @@ export interface ConversationSummaryDto {
   unreadCount: number;
 }
 
+export interface EnsureConversationDto {
+  conversationId: number;
+  friendId: number;
+  friendUsername: string;
+}
+
 export const messagesApi = {
   conversations: () =>
     api.get("/api/Messages/conversations").then(r => r.data as ConversationSummaryDto[]),
+
+  ensureConversation: (friendId: number) =>
+    api.post(`/api/Messages/with/${friendId}`).then(r => r.data as EnsureConversationDto),
 
   getMessages: (friendId: number, page = 1) =>
     api.get(`/api/Messages/${friendId}?page=${page}`).then(r => r.data as MessageDto[]),

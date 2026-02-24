@@ -101,8 +101,15 @@ const FriendProfile = () => {
       setRemoving(true);
       await friendsApi.remove(friendNumericId);
       navigate("/friends");
-    } catch (e: any) {
-      setActionError(e?.response?.data?.message ?? "Failed to remove friend.");
+    } catch (e: unknown) {
+      const message =
+        typeof e === "object" &&
+        e !== null &&
+        "response" in e &&
+        typeof (e as { response?: { data?: { message?: string } } }).response?.data?.message === "string"
+          ? (e as { response?: { data?: { message?: string } } }).response?.data?.message
+          : "Failed to remove friend.";
+      setActionError(message);
     } finally {
       setRemoving(false);
     }
@@ -196,7 +203,7 @@ const FriendProfile = () => {
               <UserMinus className="w-4 h-4" />
               {removing ? "Removing..." : "Remove"}
             </Button>
-            <Button onClick={() => navigate(`/messages?user=${friendNumericId}`)} className="gap-2">
+            <Button onClick={() => navigate(`/messages/${friendNumericId}`)} className="gap-2">
               <MessageCircle className="w-4 h-4" />
               Message
             </Button>
@@ -330,3 +337,4 @@ const FriendProfile = () => {
 };
 
 export default FriendProfile;
+

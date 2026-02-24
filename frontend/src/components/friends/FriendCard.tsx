@@ -28,7 +28,7 @@ export const FriendCard = ({
   const handleHeaderActivate = () => onViewLibrary(friend);
   const handleChatClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
-    navigate(`/messages?user=${friend.id}`);
+    navigate(`/messages/${friend.id}`);
   };
 
   return (
@@ -133,3 +133,4 @@ export const FriendCard = ({
     </div>
   );
 };
+

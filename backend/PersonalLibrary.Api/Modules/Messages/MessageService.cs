@@ -91,6 +91,25 @@ public class MessageService
         return (true, "", messages);
     }
 
+    public async Task<(bool ok, string error, EnsureConversationDto? conversation)> EnsureConversationAsync(
+        int userId, int friendId)
+    {
+        if (!await AreFriendsAsync(userId, friendId))
+            return (false, "You are not friends with this user.", null);
+
+        var friendUsername = await _context.Users
+            .AsNoTracking()
+            .Where(u => u.Id == friendId)
+            .Select(u => u.Username)
+            .FirstOrDefaultAsync();
+
+        if (string.IsNullOrWhiteSpace(friendUsername))
+            return (false, "Friend not found.", null);
+
+        // The conversation is defined by the friend pair in this direct-message model.
+        return (true, "", new EnsureConversationDto(friendId, friendId, friendUsername));
+    }
+
     public async Task<(bool ok, string error, MessageDto? message)> SendMessageAsync(
         int senderId, int receiverId, string content)
     {

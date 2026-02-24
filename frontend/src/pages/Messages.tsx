@@ -1,12 +1,14 @@
 ﻿import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, MessageCircle, Search, Pencil, Trash2, Check, X, ChevronLeft } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { messagesApi, MessageDto, ConversationSummaryDto } from "@/api/messages";
 import { useChatHub } from "@/hooks/useChatHub";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 function formatTime(iso: string) {
   const d = new Date(iso);
@@ -32,6 +34,9 @@ function dateSeparator(prev: MessageDto | undefined, curr: MessageDto) {
 }
 
 const Messages = () => {
+  const { friendId: friendIdParam } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const { user } = useAuth();
   const [activeFriendId, setActiveFriendId] = useState<number | null>(null);
 
@@ -47,6 +52,7 @@ const Messages = () => {
 
   const messageListRef = useRef<HTMLDivElement>(null);
   const scrollByConversationRef = useRef<Record<number, number>>({});
+  const lastMarkedFriendIdRef = useRef<number | null>(null);
 
   const getDistanceFromBottom = useCallback(() => {
     const el = messageListRef.current;
@@ -85,9 +91,63 @@ const Messages = () => {
     }
   }, []);
 
+  const markConversationAsRead = useCallback(
+    async (friendId: number) => {
+      if (lastMarkedFriendIdRef.current === friendId) return;
+
+      lastMarkedFriendIdRef.current = friendId;
+      try {
+        await messagesApi.markRead(friendId);
+        setConversations((prev) =>
+          prev.map((c) => (c.friendId === friendId ? { ...c, unreadCount: 0 } : c))
+        );
+        window.dispatchEvent(new Event("messages:unread-count-refresh"));
+      } catch {
+        if (lastMarkedFriendIdRef.current === friendId) {
+          lastMarkedFriendIdRef.current = null;
+        }
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
+
+  useEffect(() => {
+    if (!friendIdParam) return;
+
+    const parsedFriendId = Number(friendIdParam);
+    if (!Number.isInteger(parsedFriendId) || parsedFriendId <= 0) {
+      toast({ title: "Could not open chat", variant: "destructive" });
+      navigate("/messages", { replace: true });
+      return;
+    }
+
+    let active = true;
+
+    const ensureAndOpenConversation = async () => {
+      try {
+        const ensuredConversation = await messagesApi.ensureConversation(parsedFriendId);
+        if (!active) return;
+
+        saveCurrentConversationScroll();
+        setActiveFriendId(ensuredConversation.friendId);
+        await loadConversations();
+      } catch {
+        if (!active) return;
+        toast({ title: "Could not open chat", variant: "destructive" });
+        navigate("/messages", { replace: true });
+      }
+    };
+
+    void ensureAndOpenConversation();
+
+    return () => {
+      active = false;
+    };
+  }, [friendIdParam, loadConversations, navigate, saveCurrentConversationScroll, toast]);
 
   useEffect(() => {
     return () => {
@@ -117,12 +177,8 @@ const Messages = () => {
       })
       .catch(() => setMessages([]));
 
-    messagesApi.markRead(activeFriendId).then(() => {
-      setConversations((prev) =>
-        prev.map((c) => (c.friendId === activeFriendId ? { ...c, unreadCount: 0 } : c))
-      );
-    });
-  }, [activeFriendId]);
+    void markConversationAsRead(activeFriendId);
+  }, [activeFriendId, markConversationAsRead]);
 
   const handleIncoming = useCallback(
     (msg: MessageDto) => {
@@ -131,6 +187,9 @@ const Messages = () => {
         const friendId = msg.senderId === user?.id ? msg.receiverId : msg.senderId;
 
         if (exists) {
+          if (friendId === lastMarkedFriendIdRef.current && msg.senderId !== user?.id && friendId !== activeFriendId) {
+            lastMarkedFriendIdRef.current = null;
+          }
           return prev
             .map((c) =>
               c.friendId === friendId
@@ -165,10 +224,10 @@ const Messages = () => {
       preserveOrStick(prevTop, prevHeight, shouldStickToBottom);
 
       if (msg.senderId === activeFriendId) {
-        messagesApi.markRead(activeFriendId);
+        void markConversationAsRead(activeFriendId);
       }
     },
-    [activeFriendId, isNearBottom, loadConversations, preserveOrStick, user?.id]
+    [activeFriendId, isNearBottom, loadConversations, markConversationAsRead, preserveOrStick, user?.id]
   );
 
   useChatHub(handleIncoming);
@@ -184,11 +243,14 @@ const Messages = () => {
   const openConversation = (friendId: number) => {
     saveCurrentConversationScroll();
     setActiveFriendId(friendId);
+    void markConversationAsRead(friendId);
+    navigate(`/messages/${friendId}`);
   };
 
   const closeConversationOnMobile = () => {
     saveCurrentConversationScroll();
     setActiveFriendId(null);
+    navigate("/messages");
   };
 
   const handleSend = async () => {
@@ -518,3 +580,7 @@ const Messages = () => {
 };
 
 export default Messages;
+
+
+
+

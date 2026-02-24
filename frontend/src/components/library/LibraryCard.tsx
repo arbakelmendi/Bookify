@@ -48,7 +48,21 @@ export const LibraryCard = ({
     book.status === "finished" || (totalPages > 0 && currentPage >= totalPages);
   const isReading =
     book.status === "reading" || (currentPage > 1 && (totalPages <= 0 || currentPage < totalPages));
+  const displayStatus: ReadingStatus = isFinished
+    ? "finished"
+    : book.status === "to-read"
+    ? "to-read"
+    : "reading";
   const readingCtaLabel = isFinished ? "Read again" : isReading ? "Continue reading" : "Start reading";
+  const progressValue = isFinished ? 100 : isReading ? percent : 0;
+  const progressLabel = isFinished ? 100 : Math.round(isReading ? percent : 0);
+  const pageText = isFinished
+    ? "Finished"
+    : isReading
+    ? totalPages > 0
+      ? `Page ${currentPage} of ${totalPages}`
+      : "Reading"
+    : "Not started";
 
   const handleNavigate = () => {
     navigate(`/books/${book.id}`);
@@ -119,22 +133,18 @@ export const LibraryCard = ({
           </div>
 
           <div className="mt-2">
-            <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${statusColors[book.status]}`}>
-              {statusLabels[book.status]}
+            <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${statusColors[displayStatus]}`}>
+              {statusLabels[displayStatus]}
             </span>
           </div>
 
           <div className="mt-3 h-[56px]">
             <div className="flex justify-between text-xs text-muted-foreground mb-1">
               <span>Progress</span>
-              <span>{Math.round(isReading || isFinished ? percent : 0)}%</span>
+              <span>{progressLabel}%</span>
             </div>
-            <Progress value={isReading || isFinished ? percent : 0} className="h-1.5" />
-            <p className="mt-1 text-xs text-muted-foreground">
-              {isReading || isFinished
-                ? `Page ${currentPage} of ${totalPages || "?"}`
-                : "Not started"}
-            </p>
+            <Progress value={progressValue} className="h-1.5" />
+            <p className="mt-1 text-xs text-muted-foreground">{pageText}</p>
           </div>
 
           <div className="mt-auto pt-3">
