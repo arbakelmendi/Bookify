@@ -8,7 +8,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getBooks } from "@/api/books";
 import type { Book } from "@/types/book";
 
-export const HeroSection = () => {
+interface HeroSectionProps {
+  contentClassName?: string;
+}
+
+export const HeroSection = ({ contentClassName = "mx-auto w-full max-w-[1280px] px-4 md:px-6" }: HeroSectionProps) => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const [featuredBooks, setFeaturedBooks] = useState<Book[]>([]);
@@ -63,7 +67,7 @@ export const HeroSection = () => {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent" />
 
         {/* Content */}
-        <div className="container mx-auto px-4 relative z-10">
+        <div className={`${contentClassName} relative z-10`}>
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -204,7 +208,7 @@ export const HeroSection = () => {
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 relative z-10">
+      <div className={`${contentClassName} relative z-10`}>
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <motion.div
             initial={{ opacity: 0, x: -30 }}

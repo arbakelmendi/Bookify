@@ -142,6 +142,7 @@ using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var context = services.GetRequiredService<AppDbContext>();
+    await context.Database.MigrateAsync();
 
     var adminEmail = "admin@bookify.com";
     var adminExists = await context.Users.AnyAsync(u => u.Email.ToLower() == adminEmail.ToLower());

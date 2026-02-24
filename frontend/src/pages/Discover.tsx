@@ -64,12 +64,13 @@ const Discover = () => {
       .sort((a, b) => a.category.localeCompare(b.category));
   }, [visibleBooks]);
 
+  const pageContainerClass = "mx-auto w-full max-w-[1280px] px-4 md:px-6";
 
   return (
     <div className="min-h-screen">
-      <HeroSection />
+      <HeroSection contentClassName={pageContainerClass} />
 
-      <div className="mx-auto max-w-7xl px-6 lg:px-8 py-8 space-y-12">
+      <div className={`${pageContainerClass} py-8 space-y-12`}>
         {loading && <p className="text-muted-foreground">Loading books...</p>}
         {error && <p className="text-destructive">{error}</p>}
 

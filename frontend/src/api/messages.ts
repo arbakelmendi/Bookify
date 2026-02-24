@@ -6,6 +6,7 @@ export interface MessageDto {
   receiverId: number;
   content: string;
   sentAt: string;
+  editedAt: string | null;
   isRead: boolean;
 }
 
@@ -29,4 +30,10 @@ export const messagesApi = {
 
   markRead: (friendId: number) =>
     api.put(`/api/Messages/${friendId}/read`),
+
+  updateMessage: (messageId: number, content: string) =>
+    api.put(`/api/Messages/${messageId}`, { content }).then(r => r.data as MessageDto),
+
+  deleteMessage: (messageId: number) =>
+    api.delete(`/api/Messages/${messageId}`),
 };

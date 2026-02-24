@@ -56,7 +56,7 @@ export const BookSection = ({ title, books }: BookSectionProps) => {
 
       <div
         ref={scrollRef}
-        className="flex gap-6 overflow-x-auto scrollbar-hide pb-4 -mx-4 px-4"
+        className="flex gap-6 overflow-x-auto scrollbar-hide pb-4"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {books.map((book, index) => (

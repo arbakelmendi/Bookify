@@ -21,6 +21,9 @@ public class MessageService
             ((fr.SenderId == userA && fr.ReceiverId == userB) ||
              (fr.SenderId == userB && fr.ReceiverId == userA)));
 
+    private static MessageDto ToDto(Message m) =>
+        new(m.Id, m.SenderId, m.ReceiverId, m.Content, m.SentAt, m.EditedAt, m.IsRead);
+
     public async Task<List<ConversationSummaryDto>> GetConversationsAsync(int userId)
     {
         // Get all friend IDs
@@ -82,7 +85,7 @@ public class MessageService
             .OrderBy(m => m.SentAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(m => new MessageDto(m.Id, m.SenderId, m.ReceiverId, m.Content, m.SentAt, m.IsRead))
+            .Select(m => new MessageDto(m.Id, m.SenderId, m.ReceiverId, m.Content, m.SentAt, m.EditedAt, m.IsRead))
             .ToListAsync();
 
         return (true, "", messages);
@@ -106,7 +109,7 @@ public class MessageService
         _context.Messages.Add(msg);
         await _context.SaveChangesAsync();
 
-        return (true, "", new MessageDto(msg.Id, msg.SenderId, msg.ReceiverId, msg.Content, msg.SentAt, msg.IsRead));
+        return (true, "", ToDto(msg));
     }
 
     public async Task MarkReadAsync(int userId, int friendId)
@@ -119,5 +122,40 @@ public class MessageService
 
         foreach (var m in unread) m.IsRead = true;
         await _context.SaveChangesAsync();
+    }
+
+    public async Task<(bool ok, string error, MessageDto? message)> UpdateMessageAsync(
+        int userId, int messageId, string content)
+    {
+        var trimmed = content.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+            return (false, "Message content cannot be empty.", null);
+
+        var msg = await _context.Messages.FirstOrDefaultAsync(m => m.Id == messageId);
+        if (msg is null)
+            return (false, "Message not found.", null);
+
+        if (msg.SenderId != userId)
+            return (false, "You can edit only your own messages.", null);
+
+        msg.Content = trimmed;
+        msg.EditedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return (true, "", ToDto(msg));
+    }
+
+    public async Task<(bool ok, string error)> DeleteMessageAsync(int userId, int messageId)
+    {
+        var msg = await _context.Messages.FirstOrDefaultAsync(m => m.Id == messageId);
+        if (msg is null)
+            return (false, "Message not found.");
+
+        if (msg.SenderId != userId)
+            return (false, "You can delete only your own messages.");
+
+        _context.Messages.Remove(msg);
+        await _context.SaveChangesAsync();
+        return (true, "");
     }
 }

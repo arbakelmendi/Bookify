@@ -75,6 +75,44 @@ public class MessagesController : ControllerBase
         return NoContent();
     }
 
+    // PUT /api/Messages/{messageId}
+    [HttpPut("{messageId:int}")]
+    public async Task<IActionResult> UpdateMessage(int messageId, [FromBody] UpdateMessageDto dto)
+    {
+        var userId = GetUserId();
+        var (ok, error, message) = await _service.UpdateMessageAsync(userId, messageId, dto.Content);
+
+        if (!ok)
+        {
+            if (error.Contains("own messages", StringComparison.OrdinalIgnoreCase))
+                return Forbid();
+            if (error.Contains("not found", StringComparison.OrdinalIgnoreCase))
+                return NotFound(new { message = error });
+            return BadRequest(new { message = error });
+        }
+
+        return Ok(message);
+    }
+
+    // DELETE /api/Messages/{messageId}
+    [HttpDelete("{messageId:int}")]
+    public async Task<IActionResult> DeleteMessage(int messageId)
+    {
+        var userId = GetUserId();
+        var (ok, error) = await _service.DeleteMessageAsync(userId, messageId);
+
+        if (!ok)
+        {
+            if (error.Contains("own messages", StringComparison.OrdinalIgnoreCase))
+                return Forbid();
+            if (error.Contains("not found", StringComparison.OrdinalIgnoreCase))
+                return NotFound(new { message = error });
+            return BadRequest(new { message = error });
+        }
+
+        return NoContent();
+    }
+
     private int GetUserId()
     {
         var idStr =

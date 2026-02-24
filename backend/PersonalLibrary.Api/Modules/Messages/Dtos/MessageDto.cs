@@ -6,5 +6,6 @@ public record MessageDto(
     int ReceiverId,
     string Content,
     DateTime SentAt,
+    DateTime? EditedAt,
     bool IsRead
 );
