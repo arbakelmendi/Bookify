@@ -1,13 +1,41 @@
-﻿import { Link } from "react-router-dom";
-import { BookOpen, Github, Twitter, Instagram } from "lucide-react";
+﻿import { useState } from "react";
+import { Link } from "react-router-dom";
+import { BookOpen, Github, Twitter, Instagram, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { subscribeNewsletter } from "@/api/newsletter";
 
 export const Footer = () => {
+  const { toast } = useToast();
+  const [email, setEmail] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSubscribe = async () => {
+    const value = email.trim();
+    if (!value) return;
+
+    try {
+      setSaving(true);
+      await subscribeNewsletter(value);
+      setEmail("");
+      toast({ title: "Subscribed", description: "Email u ruajt me sukses." });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to subscribe.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <footer className="bg-card border-t border-border mt-16">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           <div className="col-span-2 md:col-span-1 space-y-4">
             <Link to="/" className="flex items-center gap-2">
               <BookOpen className="w-6 h-6 text-primary" />
@@ -89,6 +117,31 @@ export const Footer = () => {
                 </Link>
               </li>
             </ul>
+          </div>
+
+          <div className="col-span-2 md:col-span-1 space-y-4">
+            <h4 className="font-semibold text-foreground">Stay Updated</h4>
+            <p className="text-sm text-muted-foreground">
+              Get notified about new releases and reading recommendations.
+            </p>
+            <div className="flex gap-2">
+              <Input
+                type="email"
+                placeholder="Enter your email"
+                className="flex-1"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleSubscribe();
+                  }
+                }}
+              />
+              <Button size="icon" onClick={() => void handleSubscribe()} disabled={saving}>
+                <Mail className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
 

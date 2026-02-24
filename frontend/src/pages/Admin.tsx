@@ -19,6 +19,7 @@ import {
   Edit,
   Plus,
   MessageSquare,
+  Mail,
   Star,
   Check,
   X,
@@ -94,6 +95,13 @@ import {
   type AdminReviewDto,
   patchAdminReview,
 } from "@/api/adminReviews";
+import {
+  createAdminNewsletterEmail,
+  deleteAdminNewsletterEmail,
+  getAdminNewsletterEmails,
+  type NewsletterEmailDto,
+  updateAdminNewsletterEmail,
+} from "@/api/newsletter";
 import type { User } from "@/types/auth";
 
 import {
@@ -263,6 +271,14 @@ const Admin = () => {
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
+
+  // Newsletter emails
+  const [newsletterEmails, setNewsletterEmails] = useState<NewsletterEmailDto[]>([]);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [newEmail, setNewEmail] = useState("");
+  const [editingEmailId, setEditingEmailId] = useState<number | null>(null);
+  const [editingEmailValue, setEditingEmailValue] = useState("");
 
 
   // Redirect if not admin
@@ -810,8 +826,74 @@ async function handleDeleteCategory(id: number) {
     setCatError(e?.message ?? "Failed to delete category.");
   }
 }
+
+async function loadNewsletterEmails() {
+  setEmailLoading(true);
+  setEmailError(null);
+  try {
+    const data = await getAdminNewsletterEmails();
+    setNewsletterEmails(Array.isArray(data) ? data : []);
+  } catch (e: any) {
+    setEmailError(e?.message ?? "Failed to load emails.");
+  } finally {
+    setEmailLoading(false);
+  }
+}
+
+async function handleCreateNewsletterEmail() {
+  const email = newEmail.trim();
+  if (!email) return;
+
+  setEmailError(null);
+  try {
+    await createAdminNewsletterEmail(email);
+    setNewEmail("");
+    await loadNewsletterEmails();
+  } catch (e: any) {
+    setEmailError(e?.message ?? "Failed to add email.");
+  }
+}
+
+function startEditNewsletterEmail(item: NewsletterEmailDto) {
+  setEditingEmailId(item.id);
+  setEditingEmailValue(item.email);
+}
+
+function cancelEditNewsletterEmail() {
+  setEditingEmailId(null);
+  setEditingEmailValue("");
+}
+
+async function handleUpdateNewsletterEmail() {
+  if (editingEmailId === null) return;
+  const email = editingEmailValue.trim();
+  if (!email) return;
+
+  setEmailError(null);
+  try {
+    await updateAdminNewsletterEmail(editingEmailId, email);
+    cancelEditNewsletterEmail();
+    await loadNewsletterEmails();
+  } catch (e: any) {
+    setEmailError(e?.message ?? "Failed to update email.");
+  }
+}
+
+async function handleDeleteNewsletterEmail(id: number) {
+  const ok = window.confirm("Delete this email?");
+  if (!ok) return;
+
+  setEmailError(null);
+  try {
+    await deleteAdminNewsletterEmail(id);
+    await loadNewsletterEmails();
+  } catch (e: any) {
+    setEmailError(e?.message ?? "Failed to delete email.");
+  }
+}
 useEffect(() => {
   loadCategories();
+  loadNewsletterEmails();
 }, []);
 
 
@@ -1091,7 +1173,7 @@ useEffect(() => {
 
           {/* Main Content */}
           <Tabs defaultValue="users" className="space-y-6">
-            <TabsList className="grid w-full max-w-2xl grid-cols-5">
+            <TabsList className="grid w-full max-w-3xl grid-cols-6">
               <TabsTrigger value="users" className="gap-2">
                 <Users className="w-4 h-4" />
                 Users
@@ -1112,6 +1194,10 @@ useEffect(() => {
               <Tag className="w-4 h-4" />
               Categories
             </TabsTrigger>
+              <TabsTrigger value="emails" className="gap-2">
+                <Mail className="w-4 h-4" />
+                Emails
+              </TabsTrigger>
 
             </TabsList>
 
@@ -1876,6 +1962,133 @@ useEffect(() => {
                             <DropdownMenuItem
                               className="text-destructive"
                               onClick={() => handleDeleteCategory(cat.id)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  </TabsContent>
+
+  <TabsContent value="emails">
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <CardTitle>Newsletter Emails</CardTitle>
+            <CardDescription>Manage subscriber emails from footer form.</CardDescription>
+          </div>
+
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleCreateNewsletterEmail();
+            }}
+          >
+            <div className="relative w-72">
+              <Input
+                placeholder="Add email..."
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+              />
+            </div>
+            <Button type="submit" disabled={emailLoading || !newEmail.trim()} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Add
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={loadNewsletterEmails}
+              disabled={emailLoading}
+              title="Refresh emails"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+          </form>
+        </div>
+      </CardHeader>
+
+      <CardContent>
+        {emailLoading ? (
+          <div className="text-center py-12">
+            <RefreshCw className="w-8 h-8 mx-auto mb-4 animate-spin text-primary" />
+            <p className="text-muted-foreground">Loading emails...</p>
+          </div>
+        ) : emailError ? (
+          <p className="text-destructive">{emailError}</p>
+        ) : newsletterEmails.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Mail className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>No emails yet</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Updated</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {newsletterEmails.map((item) => {
+                const isEditing = editingEmailId === item.id;
+                return (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">{item.id}</TableCell>
+                    <TableCell>
+                      {isEditing ? (
+                        <Input
+                          value={editingEmailValue}
+                          onChange={(e) => setEditingEmailValue(e.target.value)}
+                          className="max-w-sm"
+                        />
+                      ) : (
+                        <span className="font-medium">{item.email}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(item.updatedAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {isEditing ? (
+                        <div className="flex justify-end gap-2">
+                          <Button onClick={handleUpdateNewsletterEmail} disabled={!editingEmailValue.trim()}>
+                            Save
+                          </Button>
+                          <Button variant="outline" onClick={cancelEditNewsletterEmail}>
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => startEditNewsletterEmail(item)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDeleteNewsletterEmail(item.id)}
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
                               Delete

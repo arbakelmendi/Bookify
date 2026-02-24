@@ -14,6 +14,7 @@ using System.Text;
 using PersonalLibrary.Api.Modules.Recommendations;
 using PersonalLibrary.Api.Modules.Notifications;
 using PersonalLibrary.Api.Modules.Reviews;
+using PersonalLibrary.Api.Modules.Newsletter;
 using PersonalLibrary.Api.Modules.Messages;
 
 
@@ -84,6 +85,7 @@ builder.Services.AddScoped<CategoriesService>();
 builder.Services.AddScoped<RecommendationService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<ReviewsService>();
+builder.Services.AddSingleton<NewsletterStore>();
 builder.Services.AddScoped<MessageService>();
 
 
