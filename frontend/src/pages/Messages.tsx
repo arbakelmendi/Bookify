@@ -35,7 +35,13 @@ function dateSeparator(prev: MessageDto | undefined, curr: MessageDto) {
 const Messages = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeFriendId = searchParams.get("friend") ? Number(searchParams.get("friend")) : null;
+  const userParam = searchParams.get("user");
+  const friendParam = searchParams.get("friend");
+  const activeFriendId = userParam
+    ? Number(userParam)
+    : friendParam
+      ? Number(friendParam)
+      : null;
 
   const [conversations, setConversations] = useState<ConversationSummaryDto[]>([]);
   const [messages, setMessages] = useState<MessageDto[]>([]);
@@ -195,7 +201,7 @@ const Messages = () => {
               filteredConversations.map(conv => (
                 <button
                   key={conv.friendId}
-                  onClick={() => setSearchParams({ friend: String(conv.friendId) })}
+                  onClick={() => setSearchParams({ user: String(conv.friendId) })}
                   className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-muted/50 transition-colors border-b border-border/50 ${
                     activeFriendId === conv.friendId ? "bg-muted" : ""
                   }`}

@@ -6,6 +6,27 @@ export interface FriendLibraryBook {
   author: string | null;
   coverImageUrl: string;
   status: "Reading" | "Finished" | "Planned";
+  pagesRead?: number | null;
+  totalPages?: number | null;
+  percent?: number | null;
+}
+
+export interface FriendRecentBook {
+  bookId: number;
+  coverImageUrl: string;
+}
+
+export interface FriendCard {
+  id: number;
+  email: string;
+  username?: string | null;
+  booksCount: number;
+  recentBooks: FriendRecentBook[];
+}
+
+export interface FriendStats {
+  friends: number;
+  reviews: number;
 }
 
 export const friendsApi = {
@@ -13,8 +34,21 @@ export const friendsApi = {
   incomingCount: () => api.get("/api/Friends/requests/incoming/count").then(r => r.data as { count: number }),
   outgoing: () => api.get("/api/Friends/outgoing").then(r => r.data),
   list: () => api.get("/api/Friends/list").then(r => r.data),
+  listCards: () => api.get("/api/Friends/list/cards").then(r => r.data as FriendCard[]),
   getFriendLibrary: (friendId: number) =>
     api.get(`/api/Friends/${friendId}/library`).then(r => r.data as FriendLibraryBook[]),
+  getFriendStats: (friendId: number) =>
+    api.get(`/api/Friends/${friendId}/stats`).then((r) => {
+      const data = r.data as {
+        friends?: number;
+        reviews?: number;
+      };
+
+      return {
+        friends: data.friends ?? 0,
+        reviews: data.reviews ?? 0,
+      } satisfies FriendStats;
+    }),
 
   sendRequest: (receiverId: number) =>
     api.post("/api/Friends/request", { receiverId }).then(r => r.data),

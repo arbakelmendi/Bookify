@@ -85,6 +85,7 @@ public class FriendService
     public async Task<List<object>> GetFriendsAsync(int userId)
     {
         var friendIds = await _context.FriendRequests
+            .AsNoTracking()
             .Where(fr => fr.Status == FriendRequestStatuses.Accepted &&
                          (fr.SenderId == userId || fr.ReceiverId == userId))
             .Select(fr => fr.SenderId == userId ? fr.ReceiverId : fr.SenderId)
@@ -92,12 +93,81 @@ public class FriendService
             .ToListAsync();
 
         var friends = await _context.Users
+            .AsNoTracking()
             .Where(u => friendIds.Contains(u.Id))
             .Select(u => new { u.Id, u.Email, u.Username })
             .ToListAsync();
 
         return friends.Cast<object>().ToList();
     }
+
+    public async Task<List<FriendCardDto>> GetFriendsCardsAsync(int userId)
+    {
+        var friendIds = await _context.FriendRequests
+            .AsNoTracking()
+            .Where(fr => fr.Status == FriendRequestStatuses.Accepted &&
+                         (fr.SenderId == userId || fr.ReceiverId == userId))
+            .Select(fr => fr.SenderId == userId ? fr.ReceiverId : fr.SenderId)
+            .Distinct()
+            .ToListAsync();
+
+        if (friendIds.Count == 0)
+            return new List<FriendCardDto>();
+
+        var friends = await _context.Users
+            .AsNoTracking()
+            .Where(u => friendIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.Email, u.Username })
+            .ToListAsync();
+
+        var friendBooks = await _context.UserBooks
+            .AsNoTracking()
+            .Where(ub => friendIds.Contains(ub.UserId))
+            .Select(ub => new FriendBookProjection(
+                ub.UserId,
+                ub.BookId,
+                ub.LastUpdated,
+                ub.Book != null ? ub.Book.CoverImageUrl : string.Empty
+            ))
+            .ToListAsync();
+
+        var booksByFriend = friendBooks
+            .GroupBy(b => b.UserId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        return friends
+            .OrderBy(f => f.Username ?? f.Email)
+            .Select(f =>
+            {
+                booksByFriend.TryGetValue(f.Id, out var booksForFriend);
+                var books = booksForFriend ?? new List<FriendBookProjection>();
+
+                var recentBooks = books
+                    .OrderByDescending(b => b.LastUpdated)
+                    .Take(3)
+                    .Select(b => new FriendRecentBookDto(
+                        b.BookId,
+                        b.CoverImageUrl ?? string.Empty
+                    ))
+                    .ToList();
+
+                return new FriendCardDto(
+                    f.Id,
+                    f.Email,
+                    f.Username,
+                    books.Count,
+                    recentBooks
+                );
+            })
+            .ToList();
+    }
+
+    private sealed record FriendBookProjection(
+        int UserId,
+        int BookId,
+        DateTime LastUpdated,
+        string CoverImageUrl
+    );
 
     // ✅ Send a friend request
     public async Task<(bool ok, string error, FriendRequestDto? data)> SendRequestAsync(int senderId, int receiverId)
@@ -255,11 +325,48 @@ public class FriendService
                 ub.Book!.Title,
                 ub.Book!.Author,
                 ub.Book!.CoverImageUrl,
-                ub.Status
+                ub.Status,
+                ub.PagesRead,
+                ub.TotalPages,
+                ub.Percent
             ))
             .ToListAsync();
 
         return (true, "", books);
+    }
+
+    public async Task<(bool ok, string error, FriendStatsDto? data)> GetFriendStatsAsync(int userId, int friendId)
+    {
+        var areFriends = await _context.FriendRequests
+            .AsNoTracking()
+            .AnyAsync(fr =>
+                fr.Status == FriendRequestStatuses.Accepted &&
+                ((fr.SenderId == userId && fr.ReceiverId == friendId) ||
+                 (fr.SenderId == friendId && fr.ReceiverId == userId)));
+
+        if (!areFriends)
+            return (false, "You are not friends with this user.", null);
+
+        var friendConnections = await _context.FriendRequests
+            .AsNoTracking()
+            .Where(fr =>
+                fr.Status == FriendRequestStatuses.Accepted &&
+                (fr.SenderId == friendId || fr.ReceiverId == friendId))
+            .Select(fr => fr.SenderId == friendId ? fr.ReceiverId : fr.SenderId)
+            .Distinct()
+            .CountAsync();
+
+        var reviewsCount = await _context.BookReviews
+            .AsNoTracking()
+            .CountAsync(r => r.UserId == friendId);
+
+        var dto = new FriendStatsDto
+        {
+            Friends = friendConnections,
+            Reviews = reviewsCount
+        };
+
+        return (true, "", dto);
     }
 
     // ✅ Remove friend (deletes accepted relationship)

@@ -5,5 +5,8 @@ public record FriendLibraryBookDto(
     string Title,
     string? Author,
     string CoverImageUrl,
-    string Status
+    string Status,
+    int? PagesRead,
+    int? TotalPages,
+    double? Percent
 );

@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Users, UserPlus, Search, Filter, Bell, BookOpen } from "lucide-react";
+import { Users, UserPlus, Search, Filter, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { AddFriendDialog } from "@/components/friends/AddFriendDialog";
-import { friendsApi } from "@/api/friends";
+import { FriendCard as FriendCardData, friendsApi } from "@/api/friends";
+import { FriendCard } from "@/components/friends/FriendCard";
 
-type FriendUser = { id: number; email: string; username?: string };
+type FriendUser = FriendCardData;
 
 type FriendRequestViewDto = {
   id: number;
@@ -49,7 +50,7 @@ const Friends = () => {
       setLoading(true);
 
       const [f, inc, out] = await Promise.all([
-        friendsApi.list(),
+        friendsApi.listCards(),
         friendsApi.incoming(),
         friendsApi.outgoing(),
       ]);
@@ -71,7 +72,10 @@ const Friends = () => {
   const filteredFriends = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return friends;
-    return friends.filter((f) => (f.email ?? "").toLowerCase().includes(q));
+    return friends.filter((f) =>
+      (f.email ?? "").toLowerCase().includes(q) ||
+      (f.username ?? "").toLowerCase().includes(q)
+    );
   }, [friends, searchQuery]);
 
   const pendingCount = incoming.length;
@@ -206,39 +210,17 @@ const Friends = () => {
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredFriends.map((f) => (
-                    <div
+                    <FriendCard
                       key={f.id}
-                      className="p-4 bg-card border border-border rounded-lg flex items-center justify-between gap-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground truncate">{f.username || f.email}</p>
-                        <p className="text-sm text-muted-foreground truncate">{f.email}</p>
-                      </div>
-
-                      <div className="flex gap-2 shrink-0">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="gap-1.5"
-                          onClick={() =>
-                            navigate(`/friend/${f.id}`, {
-                              state: { email: f.email, username: f.username },
-                            })
-                          }
-                        >
-                          <BookOpen className="w-3.5 h-3.5" />
-                          Library
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => removeFriend(f.id)}
-                          disabled={actionLoadingId === f.id}
-                        >
-                          {actionLoadingId === f.id ? "Removing..." : "Remove"}
-                        </Button>
-                      </div>
-                    </div>
+                      friend={f}
+                      removing={actionLoadingId === f.id}
+                      onViewLibrary={(friend) =>
+                        navigate(`/friend/${friend.id}`, {
+                          state: { email: friend.email, username: friend.username },
+                        })
+                      }
+                      onRemoveFriend={removeFriend}
+                    />
                   ))}
                 </div>
 

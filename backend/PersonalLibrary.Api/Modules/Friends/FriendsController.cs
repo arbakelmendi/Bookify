@@ -53,6 +53,15 @@ public class FriendsController : ControllerBase
         return Ok(data);
     }
 
+    // GET: /api/Friends/list/cards (Accepted friends with stats + recent books)
+    [HttpGet("list/cards")]
+    public async Task<IActionResult> FriendsCardsList()
+    {
+        var userId = GetUserId();
+        var data = await _service.GetFriendsCardsAsync(userId);
+        return Ok(data);
+    }
+
     // POST: /api/Friends/request
     [HttpPost("request")]
     public async Task<IActionResult> SendRequest([FromBody] SendFriendRequestDto dto)
@@ -158,6 +167,24 @@ public class FriendsController : ControllerBase
         }
 
         return Ok(books);
+    }
+
+    // GET: /api/Friends/{friendId}/stats
+    [HttpGet("{friendId:int}/stats")]
+    public async Task<IActionResult> GetFriendStats(int friendId)
+    {
+        var userId = GetUserId();
+        var (ok, error, data) = await _service.GetFriendStatsAsync(userId, friendId);
+
+        if (!ok)
+        {
+            if (error.Contains("not friends", StringComparison.OrdinalIgnoreCase))
+                return Forbid();
+
+            return BadRequest(new { message = error });
+        }
+
+        return Ok(data);
     }
 
     // DELETE: /api/Friends/remove/{friendId}
